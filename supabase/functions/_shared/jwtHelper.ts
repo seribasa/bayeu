@@ -1,8 +1,5 @@
 import * as jose from "https://deno.land/x/jose@v4.14.4/index.ts";
 
-const EIMUNISASI_JWT_SECRET = Deno.env.get("EIMUNISASI_JWT_SECRET");
-const VERIFY_JWT = Deno.env.get("VERIFY_JWT") === "true";
-
 export function getAuthToken(authorization: string): string {
   const authHeader = authorization;
   if (!authHeader) {
@@ -17,7 +14,7 @@ export function getAuthToken(authorization: string): string {
 
 export async function verifyJWT(
   jwt: string,
-  jwtSecret: string
+  jwtSecret: string,
 ): Promise<boolean> {
   const encoder = new TextEncoder();
   const secretKey = encoder.encode(jwtSecret);
