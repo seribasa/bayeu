@@ -6,7 +6,7 @@ export function getAuthToken(authorization: string): string {
     throw new Error("Missing authorization header");
   }
   const [bearer, token] = authHeader.split(" ");
-  if (bearer !== "Bearer") {
+  if (bearer.toLowerCase() !== "bearer" || !token) {
     throw new Error(`Auth header is not 'Bearer {token}'`);
   }
   return token;
