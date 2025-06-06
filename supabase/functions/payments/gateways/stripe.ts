@@ -176,4 +176,4 @@ async function handleStripeWebhook(event: any) {
   }
 }
 
-export { createStripeIntent, verifyStripeSignature, handleStripeWebhook };
+export { stripe, createStripeIntent, verifyStripeSignature, handleStripeWebhook };
