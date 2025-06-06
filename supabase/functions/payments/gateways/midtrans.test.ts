@@ -1,9 +1,46 @@
-import { verifyMidtransSignature } from "./midtrans.ts";
+import {
+  createSnapMidtrans,
+  snap,
+  verifyMidtransSignature,
+} from "./midtrans.ts";
 import { assertEquals } from "jsr:@std/assert";
+import { stub } from "jsr:@std/testing/mock";
+
+Deno.test("createSnapMidtrans - creates transaction successfully", async () => {
+  const mockTransactionResponse: {
+    token: string;
+    redirect_url: string;
+  } = {
+    token: "mock_transaction_token",
+    redirect_url: "https://mock.redirect.url",
+  };
+
+  const midtransStub = stub(
+    snap,
+    "createTransaction",
+    () => Promise.resolve(mockTransactionResponse),
+  );
+
+  try {
+    const result = await createSnapMidtrans({
+      orderId: "test-order",
+      totalAmount: 100,
+      customerName: "Test Customer",
+      customerEmail: "customerEmail",
+    });
+
+    assertEquals(result, {
+      order_id: "test-order",
+      gateway: "midtrans",
+      redirect_url: mockTransactionResponse.redirect_url,
+      token: result.token,
+    });
+  } finally {
+    midtransStub.restore();
+  }
+});
 
 Deno.test("verifyMidtransSignature", () => {
-  // setup the environment variable
-
   const signature =
     "e78e2223638cb60dbdbc88d23deb9b927ac41be7263ab38758605bac834dc25425705543707504bfef0802914cfa3f5f538fa308d1f9086211c420e7892ba2ba";
 

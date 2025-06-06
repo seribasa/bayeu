@@ -194,4 +194,4 @@ async function handleMidtransWebhook(data: any) {
   }
 }
 
-export { createSnapMidtrans, verifyMidtransSignature, handleMidtransWebhook };
+export { snap, createSnapMidtrans, verifyMidtransSignature, handleMidtransWebhook };

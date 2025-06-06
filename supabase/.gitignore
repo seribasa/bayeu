@@ -2,9 +2,10 @@
 .branches
 .temp
 
-# dotenvx
+# dotenv
 .env.keys
 .env.local
 .env.*.local
 
 */node_modules
+*/cov_profile
