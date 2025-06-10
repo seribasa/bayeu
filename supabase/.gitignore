@@ -6,6 +6,7 @@
 .env.keys
 .env.local
 .env.*.local
+.env.test
 
 */node_modules
 */cov_profile
