@@ -40,6 +40,31 @@ Deno.test("createSnapMidtrans - creates transaction successfully", async () => {
   }
 });
 
+Deno.test("createSnapMidtrans - creates transaction throws error", async () => {
+  const snapError = new Error("Snap transaction error");
+
+  const midtransStub = stub(
+    snap,
+    "createTransaction",
+    () => Promise.reject(snapError),
+  );
+
+  try {
+    await createSnapMidtrans({
+      orderId: "test-order",
+      totalAmount: 100,
+      customerName: "Test Customer",
+      customerEmail: "customerEmail",
+    });
+    throw new Error("Expected createSnapMidtrans to throw");
+  } catch (err: unknown) {
+    const error = err as Error;
+    assertEquals(error.message, snapError.message);
+  } finally {
+    midtransStub.restore();
+  }
+});
+
 Deno.test("verifyMidtransSignature", () => {
   const signature =
     "e78e2223638cb60dbdbc88d23deb9b927ac41be7263ab38758605bac834dc25425705543707504bfef0802914cfa3f5f538fa308d1f9086211c420e7892ba2ba";
