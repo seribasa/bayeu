@@ -1,10 +1,27 @@
+// deno-lint-ignore-file no-explicit-any
 import {
   createSnapMidtrans,
+  handleMidtransWebhook,
   snap,
   verifyMidtransSignature,
 } from "./midtrans.ts";
 import { assertEquals } from "jsr:@std/assert";
 import { stub } from "jsr:@std/testing/mock";
+import { paymentSupabaseAdmin } from "../../_shared/paymentSupabase.ts";
+
+Deno.test("Midtrans Snap Configuration", () => {
+  Deno.env.set("MIDTRANS_ENVIRONMENT", "production");
+  const localSnap = snap;
+
+  assertEquals(
+    localSnap.apiConfig.serverKey,
+    "test_midtrans_sandbox_server_key",
+  );
+  assertEquals(
+    localSnap.apiConfig.clientKey,
+    "test_midtrans_sandbox_client_key",
+  );
+});
 
 Deno.test("createSnapMidtrans - creates transaction successfully", async () => {
   const mockTransactionResponse: {
@@ -86,4 +103,249 @@ Deno.test("verifyMidtransSignature", () => {
 
   // Check if the result is as expected
   assertEquals(result, true);
+});
+
+Deno.test("handleMidtransWebhook - should handle valid webhook with transaction status equal to 'pending'", async () => {
+  const mockResponse = {
+    transaction_status: "pending",
+    transaction_id: "test-transaction-id",
+    order_id: "test-order-id",
+    currency: "IDR",
+  };
+  const gatewayQuery: any = {
+    select: () => ({
+      eq: () => ({
+        single: () =>
+          Promise.resolve({
+            data: {
+              gateway_id: "midtrans",
+            },
+            error: null,
+          }),
+      }),
+    }),
+  };
+  const orderQuery: any = {
+    select: () => ({
+      eq: () => ({
+        single: () =>
+          Promise.resolve({
+            data: {
+              order_id: "test-order-id",
+              user_id: "test-user-id",
+              total_amount: 10000,
+            },
+            error: null,
+          }),
+      }),
+    }),
+  };
+  const paymentQuery: any = {
+    insert: () => ({
+      select: () => ({
+        single: () =>
+          Promise.resolve({
+            data: {
+              payment_id: "test-payment-id",
+              order_id: "test-order-id",
+              gateway_payment_id: "test-transaction-id",
+              gateway_id: "midtrans",
+              amount: 10000,
+              currency: "IDR",
+              status: "pending",
+            },
+            error: null,
+          }),
+      }),
+    }),
+  };
+  const transactionsQuery: any = {
+    insert: () =>
+      Promise.resolve({
+        data: {},
+        error: null,
+      }),
+    update: () => ({
+      eq: () =>
+        Promise.resolve({
+          data: [],
+          error: null,
+        }),
+    }),
+  };
+  const fromStub = stub(
+    paymentSupabaseAdmin,
+    "from",
+    (table: string) => {
+      if (table === "payment_gateway") return gatewayQuery;
+      if (table === "transactions") return transactionsQuery;
+      if (table === "orders") return orderQuery;
+      if (table === "payments") return paymentQuery;
+      return {} as any;
+    },
+  );
+
+  try {
+    const response = await handleMidtransWebhook(mockResponse);
+    // response should be an void function
+    assertEquals(response, undefined);
+  } finally {
+    fromStub.restore();
+  }
+});
+
+Deno.test("handleMidtransWebhook - should throw error when payment gateway not found", async () => {
+  const mockResponse = {
+    transaction_status: "pending",
+    transaction_id: "test-transaction-id",
+    order_id: "test-order-id",
+    currency: "IDR",
+  };
+  const gatewayQuery: any = {
+    select: () => ({
+      eq: () => ({
+        single: () =>
+          Promise.resolve({
+            data: null,
+            error: { message: "Payment gateway not found" },
+          }),
+      }),
+    }),
+  };
+  const fromStub = stub(
+    paymentSupabaseAdmin,
+    "from",
+    (table: string) => {
+      if (table === "payment_gateway") return gatewayQuery;
+      return {} as any;
+    },
+  );
+
+  try {
+    await handleMidtransWebhook(mockResponse);
+    throw new Error("Expected handleMidtransWebhook to throw");
+  } catch (err: unknown) {
+    const error = err as Error;
+    assertEquals(error.message, "Payment gateway not found");
+  } finally {
+    fromStub.restore();
+  }
+});
+
+Deno.test("handleMidtransWebhook - should throw error when order error occurs", async () => {
+  const mockResponse = {
+    transaction_status: "pending",
+    transaction_id: "test-transaction-id",
+    order_id: "test-order-id",
+    currency: "IDR",
+  };
+  const gatewayQuery: any = {
+    select: () => ({
+      eq: () => ({
+        single: () =>
+          Promise.resolve({
+            data: {
+              gateway_id: "midtrans",
+            },
+            error: null,
+          }),
+      }),
+    }),
+  };
+  const orderQuery: any = {
+    select: () => ({
+      eq: () => ({
+        single: () =>
+          Promise.resolve({
+            data: null,
+            error: { message: "Order not found" },
+          }),
+      }),
+    }),
+  };
+  const fromStub = stub(
+    paymentSupabaseAdmin,
+    "from",
+    (table: string) => {
+      if (table === "payment_gateway") return gatewayQuery;
+      if (table === "orders") return orderQuery;
+      return {} as any;
+    },
+  );
+
+  try {
+    await handleMidtransWebhook(mockResponse);
+  } catch (err: unknown) {
+    const error = err as Error;
+    assertEquals(error.message, "Order not found");
+  } finally {
+    fromStub.restore();
+  }
+});
+
+Deno.test("handleMidtransWebhook - should throw error when payment creation fails", async () => {
+  const mockResponse = {
+    transaction_status: "pending",
+    transaction_id: "test-transaction-id",
+    order_id: "test-order-id",
+    currency: "IDR",
+  };
+  const gatewayQuery: any = {
+    select: () => ({
+      eq: () => ({
+        single: () =>
+          Promise.resolve({
+            data: {
+              gateway_id: "midtrans",
+            },
+            error: null,
+          }),
+      }),
+    }),
+  };
+  const orderQuery: any = {
+    select: () => ({
+      eq: () => ({
+        single: () =>
+          Promise.resolve({
+            data: {
+              order_id: "test-order-id",
+              user_id: "test-user-id",
+              total_amount: 10000,
+            },
+            error: null,
+          }),
+      }),
+    }),
+  };
+  const paymentQuery: any = {
+    insert: () => ({
+      select: () => ({
+        single: () =>
+          Promise.resolve({
+            data: null,
+            error: { message: "Failed to create payment" },
+          }),
+      }),
+    }),
+  };
+  const fromStub = stub(
+    paymentSupabaseAdmin,
+    "from",
+    (table: string) => {
+      if (table === "payment_gateway") return gatewayQuery;
+      if (table === "orders") return orderQuery;
+      if (table === "payments") return paymentQuery;
+      return {} as any;
+    },
+  );
+
+  try {
+    await handleMidtransWebhook(mockResponse);
+  } catch (err: unknown) {
+    const error = err as Error;
+    assertEquals(error.message, "Failed to create payment");
+  } finally {
+    fromStub.restore();
+  }
 });
