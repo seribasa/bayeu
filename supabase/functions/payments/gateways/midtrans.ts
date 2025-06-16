@@ -11,21 +11,19 @@ const MIDTRANS_ENVIRONMENT = Deno.env.get("MIDTRANS_ENVIRONMENT");
 const MIDTRANS_SANDBOX_SERVER_KEY = Deno.env.get("MIDTRANS_SANDBOX_SERVER_KEY");
 const MIDTRANS_SANDBOX_CLIENT_KEY = Deno.env.get("MIDTRANS_SANDBOX_CLIENT_KEY");
 const MIDTRANS_PRODUCTION_SERVER_KEY = Deno.env.get(
-  "MIDTRANS_PRODUCTION_SERVER_KEY"
+  "MIDTRANS_PRODUCTION_SERVER_KEY",
 );
 const MIDTRANS_PRODUCTION_CLIENT_KEY = Deno.env.get(
-  "MIDTRANS_PRODUCTION_CLIENT_KEY"
+  "MIDTRANS_PRODUCTION_CLIENT_KEY",
 );
 
-const MIDTRANS_SERVER_KEY =
-  MIDTRANS_ENVIRONMENT === "production"
-    ? MIDTRANS_PRODUCTION_SERVER_KEY
-    : MIDTRANS_SANDBOX_SERVER_KEY;
+const MIDTRANS_SERVER_KEY = MIDTRANS_ENVIRONMENT === "production"
+  ? MIDTRANS_PRODUCTION_SERVER_KEY
+  : MIDTRANS_SANDBOX_SERVER_KEY;
 
-const MIDTRANS_CLIENT_KEY =
-  MIDTRANS_ENVIRONMENT === "production"
-    ? MIDTRANS_PRODUCTION_CLIENT_KEY
-    : MIDTRANS_SANDBOX_CLIENT_KEY;
+const MIDTRANS_CLIENT_KEY = MIDTRANS_ENVIRONMENT === "production"
+  ? MIDTRANS_PRODUCTION_CLIENT_KEY
+  : MIDTRANS_SANDBOX_CLIENT_KEY;
 
 const snap = new Midtrans.Snap({
   isProduction: false,
@@ -97,7 +95,7 @@ function verifyMidtransSignature({
     body.order_id +
       body.status_code +
       body.gross_amount +
-      (body.server_key || MIDTRANS_SERVER_KEY)
+      (body.server_key || MIDTRANS_SERVER_KEY),
   );
   const expected = sha512.digest("hex");
   return signature === expected;
@@ -178,6 +176,7 @@ async function handleMidtransWebhook(data: any) {
         gateway_response: data,
         status: txStatus,
       });
+      return;
     }
 
     await paymentSupabaseAdmin
@@ -194,4 +193,9 @@ async function handleMidtransWebhook(data: any) {
   }
 }
 
-export { snap, createSnapMidtrans, verifyMidtransSignature, handleMidtransWebhook };
+export {
+  createSnapMidtrans,
+  handleMidtransWebhook,
+  snap,
+  verifyMidtransSignature,
+};

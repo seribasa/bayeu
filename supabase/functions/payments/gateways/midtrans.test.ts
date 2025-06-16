@@ -165,13 +165,6 @@ Deno.test("handleMidtransWebhook - should handle valid webhook with transaction 
         data: {},
         error: null,
       }),
-    update: () => ({
-      eq: () =>
-        Promise.resolve({
-          data: [],
-          error: null,
-        }),
-    }),
   };
   const fromStub = stub(
     paymentSupabaseAdmin,

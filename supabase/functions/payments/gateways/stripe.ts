@@ -160,6 +160,7 @@ async function handleStripeWebhook(event: any) {
         gateway_response: data,
         status: txStatus,
       });
+      return;
     }
 
     await paymentSupabaseAdmin
