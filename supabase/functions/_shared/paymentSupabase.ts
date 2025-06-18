@@ -19,6 +19,11 @@ const paymentSupabaseClient = (
     PAYMENT_SUPABASE_ANON_KEY ?? "",
     {
       global: { headers: { Authorization: authorization } },
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
     },
   );
 };
