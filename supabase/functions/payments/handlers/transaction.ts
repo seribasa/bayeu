@@ -15,12 +15,12 @@ export const handleTransaction = async (c: Context) => {
         is_successful: false,
         message: "Unauthorized",
       },
-      401
+      401,
     );
   }
   const jwt = getAuthToken(authorization);
-  const { data: userData, error: userError } =
-    await eImunisasiSupabaseAdmin.auth.getUser(jwt);
+  const { data: userData, error: userError } = await eImunisasiSupabaseAdmin
+    .auth.getUser(jwt);
   if (userError) {
     console.error(userError);
     return c.json(
@@ -28,7 +28,7 @@ export const handleTransaction = async (c: Context) => {
         is_successful: false,
         message: "Unauthorized",
       },
-      401
+      401,
     );
   }
 
@@ -42,7 +42,7 @@ export const handleTransaction = async (c: Context) => {
       payments:payments (
         order_id
       )
-      `
+      `,
     )
     .eq("transaction_id", txId)
     .single();
@@ -79,12 +79,12 @@ export const handleTransaction = async (c: Context) => {
         is_successful: false,
         message,
       },
-      status
+      status,
     );
   }
   return c.json({
     is_successful: true,
     message: "Transaction found",
     data: data,
-  });
+  }, 200);
 };
