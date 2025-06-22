@@ -10,3 +10,6 @@
 
 */node_modules
 */cov_profile
+# Coverage
+coverage/
+coverage.lcov
