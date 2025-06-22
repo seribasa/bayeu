@@ -1,0 +1,14 @@
+{
+  "nodeModulesDir": "auto",
+  "npm": {
+    "specifiers": ["stripe@18.0.0", "@supabase/realtime-js@2.11.2"]
+  },
+  "imports": {
+    "@std/testing": "jsr:@std/testing@^1.0.12"
+  },
+  "tasks": {
+    "start": "deno run --allow-net --watch=static/,routes/,data/ dev.ts",
+    "test": "deno test --allow-net --allow-env --env-file=.env.test --coverage=cov_profile",
+    "lint": "deno lint"
+  }
+}

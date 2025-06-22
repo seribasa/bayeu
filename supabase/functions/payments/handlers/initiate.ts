@@ -82,19 +82,6 @@ export const handleInitiate = async (c: Context) => {
   try {
     const req = c.req;
     const body = await req.json();
-    if (!body || typeof body !== "object") {
-      return c.json(
-        {
-          is_successful: false,
-          message: "Invalid request body",
-        },
-        400
-      );
-    }
-    const { gateway, items } = body;
-
-    const currency = gateway === "midtrans" ? "idr" : body.currency;
-
     // Validate required fields
     const errorMessageBodyRequest = validateBody(body);
     if (errorMessageBodyRequest) {
@@ -103,9 +90,13 @@ export const handleInitiate = async (c: Context) => {
           is_successful: false,
           message: errorMessageBodyRequest,
         },
-        400
+        400,
       );
     }
+
+    const { gateway, items } = body;
+
+    const currency = gateway === "midtrans" ? "idr" : body.currency;
 
     // validate products
     const isValidProducts = await validateProducts(items);
@@ -115,7 +106,7 @@ export const handleInitiate = async (c: Context) => {
           is_successful: false,
           message: "Invalid products",
         },
-        400
+        400,
       );
     }
 
@@ -127,12 +118,12 @@ export const handleInitiate = async (c: Context) => {
           is_successful: false,
           message: "Unauthorized",
         },
-        401
+        401,
       );
     }
     const jwt = getAuthToken(authorization);
-    const { data: userData, error: userError } =
-      await eImunisasiSupabaseAdmin.auth.getUser(jwt);
+    const { data: userData, error: userError } = await eImunisasiSupabaseAdmin
+      .auth.getUser(jwt);
     if (userError) {
       console.error(userError);
       return c.json(
@@ -140,7 +131,7 @@ export const handleInitiate = async (c: Context) => {
           is_successful: false,
           message: "Unauthorized",
         },
-        401
+        401,
       );
     }
     const { id: userId, email, user_metadata } = userData.user;
@@ -160,12 +151,12 @@ export const handleInitiate = async (c: Context) => {
     const totalAmount = itemsData.reduce(
       (acc: number, item: { price: number; product_id: string }) => {
         const matchingItem = items.find(
-          (orderItem: { id: string }) => orderItem.id === item.product_id
+          (orderItem: { id: string }) => orderItem.id === item.product_id,
         );
         const quantity = matchingItem?.quantity || 1;
         return acc + item.price * quantity;
       },
-      0
+      0,
     );
 
     // insert order to database
@@ -189,7 +180,7 @@ export const handleInitiate = async (c: Context) => {
     const orderItems = itemsData.map(
       (item: { product_id: string; price: number }) => {
         const matchingItem = items.find(
-          (orderItem: { id: string }) => orderItem.id === item.product_id
+          (orderItem: { id: string }) => orderItem.id === item.product_id,
         );
 
         return {
@@ -199,7 +190,7 @@ export const handleInitiate = async (c: Context) => {
           price: item.price,
           created_at: new Date(),
         };
-      }
+      },
     );
 
     const { error: orderItemsError } = await paymentSupabaseAdmin
@@ -250,17 +241,20 @@ export const handleInitiate = async (c: Context) => {
       .eq("order_id", orderId);
 
     if (updateOrderError) {
-      await rollbackOrder(orderData.order_id);
+      try {
+        await rollbackOrder(orderData.order_id);
+      } catch (rollbackError) {
+        console.error("Rollback after update failure failed:", rollbackError);
+      }
       console.error("Error updating order:", updateOrderError);
       return c.json(
         {
           is_successful: false,
           message: "Failed to update order",
         },
-        500
+        500,
       );
     }
-    
     return c.json({
       is_successful: true,
       message: "Payment initiated successfully",
@@ -274,7 +268,7 @@ export const handleInitiate = async (c: Context) => {
         message:
           "Sorry, we are unable to process your payment at this time. Please try again later.",
       },
-      500
+      500,
     );
   }
 };

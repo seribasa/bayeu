@@ -1,11 +1,11 @@
 import { Context } from "jsr:@hono/hono";
 import {
-  verifyMidtransSignature,
   handleMidtransWebhook,
+  verifyMidtransSignature,
 } from "../gateways/midtrans.ts";
 import {
-  verifyStripeSignature,
   handleStripeWebhook,
+  verifyStripeSignature,
 } from "../gateways/stripe.ts";
 
 export const handleWebhook = async (c: Context) => {
@@ -18,13 +18,13 @@ export const handleWebhook = async (c: Context) => {
           is_successful: false,
           message: "Payment gateway not specified",
         },
-        400
+        400,
       );
     }
 
     const rawBody = await c.req.text();
     const jsonBody = await c.req.json();
-
+    
     // Detect webhook source
     const midtransSignatureKey = jsonBody?.signature_key;
     if (midtransSignatureKey && paymentGateway === "midtrans") {
@@ -37,27 +37,27 @@ export const handleWebhook = async (c: Context) => {
         console.error("Invalid Midtrans signature");
         return c.json(
           { is_successful: false, message: "Invalid Midtrans signature" },
-          403
+          403,
         );
       }
       await handleMidtransWebhook(jsonBody);
       return c.json({
         is_successful: true,
         message: "Midtrans webhook processed",
-      });
+      }, 200);
     }
 
     const stripeSignature = c.req.header("stripe-signature");
     if (stripeSignature && paymentGateway === "stripe") {
       const stripeResult = await verifyStripeSignature(
         stripeSignature,
-        rawBody
+        rawBody,
       );
       if (!stripeResult.valid) {
         console.error("Invalid Stripe signature");
         return c.json(
           { is_successful: false, message: "Invalid Stripe signature" },
-          403
+          403,
         );
       }
 
@@ -66,18 +66,18 @@ export const handleWebhook = async (c: Context) => {
       return c.json({
         is_successful: true,
         message: "Stripe webhook processed",
-      });
+      }, 200);
     }
 
     return c.json(
       { is_successful: false, message: "Unknown webhook source" },
-      400
+      400,
     );
   } catch (error) {
     console.error("Error processing webhook:", error);
     return c.json(
       { is_successful: false, message: "Internal server error" },
-      500
+      500,
     );
   }
 };

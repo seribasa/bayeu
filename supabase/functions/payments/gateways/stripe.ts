@@ -160,6 +160,7 @@ async function handleStripeWebhook(event: any) {
         gateway_response: data,
         status: txStatus,
       });
+      return;
     }
 
     await paymentSupabaseAdmin
@@ -176,4 +177,4 @@ async function handleStripeWebhook(event: any) {
   }
 }
 
-export { createStripeIntent, verifyStripeSignature, handleStripeWebhook };
+export { stripe, createStripeIntent, verifyStripeSignature, handleStripeWebhook };
