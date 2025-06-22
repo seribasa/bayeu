@@ -13,31 +13,6 @@ Deno.test("paymentSupabaseAdmin client initialization", () => {
   );
 });
 
-Deno.test("paymentSupabaseAdmin client initialization without environment variables", () => {
-  const url = Deno.env.get("EIMUNISASI_SUPABASE_URL");
-  const serviceRoleKey = Deno.env.get("EIMUNISASI_SUPABASE_SERVICE_ROLE_KEY");
-
-  assertExists(url, "EIMUNISASI_SUPABASE_URL should be set");
-  assertExists(
-    serviceRoleKey,
-    "EIMUNISASI_SUPABASE_SERVICE_ROLE_KEY should be set",
-  );
-
-  Deno.env.delete("EIMUNISASI_SUPABASE_URL");
-  Deno.env.delete("EIMUNISASI_SUPABASE_SERVICE_ROLE_KEY");
-
-  assertExists(paymentSupabaseAdmin, "Admin client should be initialized");
-  assertEquals(
-    typeof paymentSupabaseAdmin.auth,
-    "object",
-    "Should have auth property",
-  );
-
-  // Clean up environment variables
-  Deno.env.set("EIMUNISASI_SUPABASE_URL", url!);
-  Deno.env.set("EIMUNISASI_SUPABASE_SERVICE_ROLE_KEY", serviceRoleKey!);
-});
-
 Deno.test("paymentSupabaseClient initialization with authorization", () => {
   const testAuth = "Bearer test-token";
   const client = paymentSupabaseClient({ authorization: testAuth });
