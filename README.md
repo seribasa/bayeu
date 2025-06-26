@@ -11,6 +11,7 @@ This project is built with [Supabase](https://supabase.io/), an open-source Fire
     - `payments/`: Functions related to payments.
     - ... other function directories
   - `migrations/`: Contains database schema migrations.
+  - `seeds/`: Contains SQL seed files for populating the database with initial data.
 
 ## Getting Started
 
@@ -86,8 +87,9 @@ To deploy this project to the base repository, follow these steps:
            payment/
              volumes/
                functions/
-               migrations/
-               seeds/
+               db/
+                  migrations/
+                  seeds/
    ```
 
 Example commands to copy the folders:
@@ -96,6 +98,6 @@ Example commands to copy the folders:
    ```bash
       cd /path/to/base/repository
       cp -r supabase/functions/ ansible/roles/payment/files/payment/volumes/functions/
-      cp -r supabase/migrations/ ansible/roles/payment/files/payment/volumes/migrations/
-      cp -r supabase/seeds/ ansible/roles/payment/files/payment/volumes/seeds/
+      cp -r supabase/migrations/ ansible/roles/payment/files/payment/volumes/db/migrations/
+      cp -r supabase/seeds/ ansible/roles/payment/files/payment/volumes/db/seeds/
    ```
