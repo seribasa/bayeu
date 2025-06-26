@@ -61,3 +61,41 @@ Create a `.env` file in the root of the project and add the necessary environmen
 ```bash
 cp .env.example .env
 ```
+
+## Deployment to our Base Repository
+
+Base Repository: [Go Here]("https://github.com/peltops/base")
+
+To deploy this project to the base repository, follow these steps:
+
+1. *Copy these folders base repository:*
+   - `supabase/functions/`
+   - `supabase/migrations/`
+   - `supabase/seeds/`
+
+2. *Paste the copied folders into the base repository.*
+   - `ansible/roles/payment/files/payment/volumes/`
+  
+  The repository structure should look like this:
+
+   ``` bash
+   ansible/
+     roles/
+       payment/
+         files/
+           payment/
+             volumes/
+               functions/
+               migrations/
+               seeds/
+   ```
+
+Example commands to copy the folders:
+*note: Change the path to your base repository accordingly.*
+
+   ```bash
+      cd /path/to/base/repository
+      cp -r supabase/functions/ ansible/roles/payment/files/payment/volumes/functions/
+      cp -r supabase/migrations/ ansible/roles/payment/files/payment/volumes/migrations/
+      cp -r supabase/seeds/ ansible/roles/payment/files/payment/volumes/seeds/
+   ```
