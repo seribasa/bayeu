@@ -11,6 +11,7 @@ This project is built with [Supabase](https://supabase.io/), an open-source Fire
     - `payments/`: Functions related to payments.
     - ... other function directories
   - `migrations/`: Contains database schema migrations.
+  - `seeds/`: Contains SQL seed files for populating the database with initial data.
 
 ## Getting Started
 
@@ -61,3 +62,40 @@ Create a `.env` file in the root of the project and add the necessary environmen
 ```bash
 cp .env.example .env
 ```
+
+## Deployment to our Base Repository
+
+Base Repository: [Go Here]("https://github.com/peltops/base")
+
+To deploy this project to the base repository, follow these steps:
+
+1. *Copy these folders base repository:*
+   - `supabase/functions/`
+   - `supabase/migrations/`
+   - `supabase/seeds/`
+
+2. *Paste the copied folders into the base repository.*
+   - `ansible/roles/payment/files/payment/volumes/`
+  
+  The repository structure should look like this:
+
+   ``` bash
+   ansible/
+     roles/
+       payment/
+         files/
+           payment/
+             volumes/
+               functions/
+               db/
+                  migrations/
+                  seeds/
+   ```
+
+Example commands to copy the folders:
+
+   ```bash
+      cp -r supabase/functions/ /path/to/base/repository/ansible/roles/payment/files/payment/volumes/functions/
+      cp -r supabase/migrations/ /path/to/base/repository/ansible/roles/payment/files/payment/volumes/db/migrations/
+      cp -r supabase/seeds/ /path/to/base/repository/ansible/roles/payment/files/payment/volumes/db/seeds/
+   ```
