@@ -93,11 +93,9 @@ To deploy this project to the base repository, follow these steps:
    ```
 
 Example commands to copy the folders:
-*note: Change the path to your base repository accordingly.*
 
    ```bash
-      cd /path/to/base/repository
-      cp -r supabase/functions/ ansible/roles/payment/files/payment/volumes/functions/
-      cp -r supabase/migrations/ ansible/roles/payment/files/payment/volumes/db/migrations/
-      cp -r supabase/seeds/ ansible/roles/payment/files/payment/volumes/db/seeds/
+      cp -r supabase/functions/ /path/to/base/repository/ansible/roles/payment/files/payment/volumes/functions/
+      cp -r supabase/migrations/ /path/to/base/repository/ansible/roles/payment/files/payment/volumes/db/migrations/
+      cp -r supabase/seeds/ /path/to/base/repository/ansible/roles/payment/files/payment/volumes/db/seeds/
    ```
