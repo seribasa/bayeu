@@ -4,6 +4,7 @@
     "specifiers": ["stripe@18.0.0", "@supabase/realtime-js@2.11.2"]
   },
   "imports": {
+    "@hookdeck/outpost-sdk": "npm:@hookdeck/outpost-sdk@^1.4.1",
     "@std/testing": "jsr:@std/testing@^1.0.12"
   },
   "tasks": {

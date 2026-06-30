@@ -12,7 +12,7 @@ import Stripe from "npm:stripe@18.0.0";
 stub(
   globalThis,
   "setTimeout",
-  (fn: () => void, _ms?: number, ..._args: any[]) => {
+  (fn: any, _ms?: number, ..._args: any[]) => {
     fn();
     return 0;
   },

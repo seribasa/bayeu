@@ -86,6 +86,7 @@ Deno.test("handleWebhook - midtrans valid signature returns 200", async () => {
     (table: string) => {
       if (table === "payment_gateway") return gatewayQuery;
       if (table === "transactions") return transactionsQuery;
+      if (table === "orders") return { select: () => ({ eq: () => ({ single: () => Promise.resolve({ data: { metadata: { tenant_id: "test" } }, error: null }) }) }) };
       return {} as any;
     },
   );
@@ -189,6 +190,7 @@ Deno.test("handleWebhook - stripe valid signature returns 200", async () => {
     (table: string) => {
       if (table === "payment_gateway") return gatewayQuery;
       if (table === "transactions") return transactionsQuery;
+      if (table === "orders") return { select: () => ({ eq: () => ({ single: () => Promise.resolve({ data: { metadata: { tenant_id: "test" } }, error: null }) }) }) };
       return {} as any;
     },
   );

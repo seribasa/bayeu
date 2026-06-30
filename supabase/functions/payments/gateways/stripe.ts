@@ -4,6 +4,7 @@ import {
   mapStripeToEnum,
   mapTransactionToStatus,
 } from "../helpers/paymentHelper.ts";
+import { publishPaymentEvent } from "../helpers/outpost.ts";
 import { CreatePaymentResponse } from "../../_shared/types/createPaymentResponse.ts";
 
 const STRIPE_ENVIRONMENT = Deno.env.get("STRIPE_ENVIRONMENT");
@@ -171,6 +172,22 @@ async function handleStripeWebhook(event: any) {
         updated_at: new Date(),
       })
       .eq("gateway_transaction_id", data.id);
+
+    if (event.type === "payment_intent.succeeded") {
+      const { data: order } = await paymentSupabaseAdmin
+        .from("orders")
+        .select("metadata")
+        .eq("order_id", orderId)
+        .single();
+
+      if (order?.metadata?.tenant_id) {
+        await publishPaymentEvent(order.metadata.tenant_id, {
+          order_id: orderId,
+          status: "success",
+          metadata: order.metadata,
+        });
+      }
+    }
   } catch (error) {
     console.error("Error handling Stripe webhook:", error);
     throw error;
