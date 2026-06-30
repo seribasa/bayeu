@@ -1,7 +1,7 @@
 import { paymentSupabaseAdmin } from "../../_shared/paymentSupabase.ts";
 import { getAuthToken } from "../../_shared/jwtHelper.ts";
 import { eImunisasiSupabaseAdmin } from "../../_shared/eimunisasiSupabase.ts";
-import { Context } from "jsr:@hono/hono";
+import { Context } from "hono";
 
 export const handleTransaction = async (c: Context) => {
   const txId = c.req.param("transaction_id");

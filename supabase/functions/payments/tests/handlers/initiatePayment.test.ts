@@ -1,7 +1,7 @@
-import { assertEquals } from "jsr:@std/assert";
+import { assertEquals } from "@std/assert";
 import { handleInitiatePayment } from "../../handlers/initiatePayment.ts";
-import { Context } from "jsr:@hono/hono";
-import { stub } from "jsr:@std/testing/mock";
+import { Context } from "hono";
+import { stub } from "@std/testing/mock";
 import { paymentSupabaseAdmin } from "../../../_shared/paymentSupabase.ts";
 
 Deno.test("handleInitiatePayment - returns 401 if missing auth header", async () => {

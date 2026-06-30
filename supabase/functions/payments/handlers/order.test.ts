@@ -1,13 +1,13 @@
 // deno-lint-ignore-file no-explicit-any
-import { assertEquals } from "jsr:@std/assert";
+import { assertEquals } from "@std/assert";
 import { handleOrderStatus } from "./order.ts";
-import { Context } from "jsr:@hono/hono";
+import { Context } from "hono";
 import { paymentSupabaseAdmin } from "../../_shared/paymentSupabase.ts";
-import { stub } from "jsr:@std/testing/mock";
-import { PostgrestQueryBuilder } from "npm:@supabase/postgrest-js@1.19.4";
-import type { SupabaseClient } from "jsr:@supabase/supabase-js@2";
+import { stub } from "@std/testing/mock";
+import { PostgrestQueryBuilder } from "@supabase/postgrest-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { eImunisasiSupabaseAdmin } from "../../_shared/eimunisasiSupabase.ts";
-import { UserResponse } from "jsr:@supabase/supabase-js@2";
+import { UserResponse } from "@supabase/supabase-js";
 
 Deno.test("handleOrderStatus - should return 401 when no authorization header", async () => {
   const mockContext = {

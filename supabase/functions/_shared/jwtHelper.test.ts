@@ -1,6 +1,6 @@
-import { assertEquals, assertThrows } from "jsr:@std/assert";
+import { assertEquals, assertThrows } from "@std/assert";
 import { getAuthToken, verifyJWT } from "./jwtHelper.ts";
-import * as jose from "https://deno.land/x/jose@v4.14.4/index.ts";
+import * as jose from "jose";
 
 Deno.test("getAuthToken", async (t) => {
     await t.step("should extract token from valid Bearer authorization header", () => {

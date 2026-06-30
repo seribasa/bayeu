@@ -1,13 +1,13 @@
 // deno-lint-ignore-file no-explicit-any
-import { assertEquals } from "jsr:@std/assert";
+import { assertEquals } from "@std/assert";
 import {
   createStripeIntent,
   handleStripeWebhook,
   stripe,
   verifyStripeSignature,
 } from "./stripe.ts";
-import { stub } from "jsr:@std/testing/mock";
-import Stripe from "npm:stripe@18.0.0";
+import { stub } from "@std/testing/mock";
+import Stripe from "stripe";
 import { paymentSupabaseAdmin } from "../../_shared/paymentSupabase.ts";
 
 Deno.test("Stripe Configuration - Sandbox Environment", () => {

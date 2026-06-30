@@ -1,4 +1,4 @@
-import Midtrans from "npm:midtrans-client@1.4.2";
+import Midtrans from "midtrans-client";
 import { paymentSupabaseAdmin } from "../../_shared/paymentSupabase.ts";
 import {
   mapMidtransToEnum,

@@ -1,4 +1,4 @@
-import Stripe from "npm:stripe@18.0.0";
+import Stripe from "stripe";
 import { paymentSupabaseAdmin } from "../../_shared/paymentSupabase.ts";
 import {
   mapStripeToEnum,

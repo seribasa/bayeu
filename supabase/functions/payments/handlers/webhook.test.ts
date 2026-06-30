@@ -1,8 +1,8 @@
 // deno-lint-ignore-file no-explicit-any
-import { assertEquals } from "jsr:@std/assert";
+import { assertEquals } from "@std/assert";
 import { handleWebhook } from "./webhook.ts";
-import { stub } from "jsr:@std/testing/mock";
-import { Context } from "jsr:@hono/hono";
+import { stub } from "@std/testing/mock";
+import { Context } from "hono";
 import { stripe } from "../gateways/stripe.ts";
 import { paymentSupabaseAdmin } from "../../_shared/paymentSupabase.ts";
 
