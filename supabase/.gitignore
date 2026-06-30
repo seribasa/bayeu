@@ -3,11 +3,11 @@
 .temp
 
 # dotenv
+.env
 .env.keys
 .env.local
 .env.*.local
 .env.test
-.env
 
 */node_modules
 */cov_profile

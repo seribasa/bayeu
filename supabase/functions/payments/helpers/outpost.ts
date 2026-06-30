@@ -5,7 +5,7 @@ const OUTPOST_API_KEY = Deno.env.get("OUTPOST_API_KEY");
  * Publishes a payment event to Hookdeck Outpost.
  * Outpost will then route this event to the pre-configured tenant destination.
  */
-export async function publishPaymentEvent(tenantId: string, payload: any) {
+export async function publishPaymentEvent(tenantId: string, payload: unknown) {
   if (!OUTPOST_API_KEY) {
     console.warn("OUTPOST_API_KEY is not set. Skipping event publish.");
     return;
@@ -67,6 +67,7 @@ export async function upsertOutpostDestination(tenantId: string, destinationUrl:
     
     if (listResponse.ok) {
       const destinations = await listResponse.json();
+      // deno-lint-ignore no-explicit-any
       const exists = destinations.find((d: any) => d.config && d.config.url === destinationUrl);
       if (exists) {
         console.log(`Destination already exists for tenant: ${tenantId}`);
