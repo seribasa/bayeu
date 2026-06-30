@@ -7,6 +7,7 @@
 .env.local
 .env.*.local
 .env.test
+.env
 
 */node_modules
 */cov_profile
