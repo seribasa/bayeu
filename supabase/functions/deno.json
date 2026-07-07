@@ -12,6 +12,8 @@
     "stripe": "npm:stripe@18.0.0",
     "midtrans-client": "npm:midtrans-client@1.4.2",
     "hono": "jsr:@hono/hono",
+    "hono/logger": "jsr:@hono/hono/logger",
+    "hono/cors": "jsr:@hono/hono/cors",
     "@supabase/postgrest-js": "npm:@supabase/postgrest-js@1.19.4"
   },
   "tasks": {
