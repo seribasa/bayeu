@@ -71,12 +71,14 @@ export async function handleInitiatePayment(c: Context) {
     const { gateway, amount, tenant_id, metadata, webhook_url } = body;
     const currency = gateway === "midtrans" ? "idr" : body.currency;
 
-    if (webhook_url) {
-      // Lazy-import to avoid circular dependencies or clutter
-      import("../helpers/outpost.ts").then(({ upsertOutpostDestination }) => {
-        upsertOutpostDestination(tenant_id, webhook_url).catch((e) => console.error("Failed to upsert destination:", e));
-      });
-    }
+if (webhook_url) {
+  try {
+    const { upsertOutpostDestination } = await import("../helpers/outpost.ts");
+    await upsertOutpostDestination(tenant_id, webhook_url);
+  } catch (e) {
+    console.error("Failed to upsert destination:", e);
+  }
+}
 
     const { data: orderData, error: orderError } = await paymentSupabaseAdmin
       .from("orders")
