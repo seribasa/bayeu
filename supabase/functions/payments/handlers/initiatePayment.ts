@@ -27,7 +27,8 @@ function validateBody(body: any): string | null {
   if (!body.gateway) return "Payment gateway is required";
   if (body.gateway !== "stripe" && body.gateway !== "midtrans") return "Payment gateway not supported yet";
   if (body.gateway == "stripe" && !body.currency) return "Currency is required";
-  if (!body.amount) return "Amount is required";
+if (!body.amount) return "Amount is required";
+if (typeof body.amount !== "number" || body.amount <= 0) return "Amount must be a positive number";
   if (!body.tenant_id) return "Tenant ID is required";
   return null;
 }
