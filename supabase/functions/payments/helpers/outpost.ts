@@ -47,6 +47,28 @@ export async function upsertOutpostDestination(tenantId: string, destinationUrl:
     return;
   }
 
+  // Validate webhook URL to prevent SSRF
+  try {
+    const url = new URL(destinationUrl);
+    if (!["http:", "https:"].includes(url.protocol)) {
+      throw new Error("Invalid webhook URL protocol");
+    }
+    // Block internal/private IPs
+    const hostname = url.hostname.toLowerCase();
+    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.startsWith("192.168.") || 
+        hostname.startsWith("10.") || hostname.startsWith("172.16.") || hostname.startsWith("::1") ||
+        hostname === "metadata.google.internal" || hostname.endsWith(".internal")) {
+      throw new Error("Webhook URL cannot point to internal/private addresses");
+    }
+  } catch (error) {
+    console.error("Invalid webhook URL:", error);
+    throw new Error("Invalid webhook URL");
+  }
+  if (!OUTPOST_API_KEY) {
+    console.warn("OUTPOST_API_KEY is not set. Skipping destination upsert.");
+    return;
+  }
+
   try {
     // 1. Ensure Tenant exists
     await fetch(`${OUTPOST_API_URL}/api/v1/tenants/${tenantId}`, {
