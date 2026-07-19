@@ -1,9 +1,10 @@
-import Midtrans from "npm:midtrans-client@1.4.2";
+import Midtrans from "midtrans-client";
 import { paymentSupabaseAdmin } from "../../_shared/paymentSupabase.ts";
 import {
   mapMidtransToEnum,
   mapTransactionToStatus,
 } from "../helpers/paymentHelper.ts";
+import { publishPaymentEvent } from "../helpers/outpost.ts";
 import { CreatePaymentResponse } from "../../_shared/types/createPaymentResponse.ts";
 import * as mod from "node:crypto";
 
@@ -187,6 +188,22 @@ async function handleMidtransWebhook(data: any) {
         updated_at: new Date(),
       })
       .eq("gateway_transaction_id", transaction_id);
+
+    if (transaction_status === "capture" || transaction_status === "settlement") {
+      const { data: order } = await paymentSupabaseAdmin
+        .from("orders")
+        .select("metadata")
+        .eq("order_id", order_id)
+        .single();
+
+      if (order?.metadata?.tenant_id) {
+        await publishPaymentEvent(order.metadata.tenant_id, {
+          order_id: order_id,
+          status: "success",
+          metadata: order.metadata,
+        });
+      }
+    }
   } catch (error) {
     console.error("Error handling Midtrans webhook:", error);
     throw error;

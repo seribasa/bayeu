@@ -1,4 +1,4 @@
-import { createClient } from "jsr:@supabase/supabase-js@2";
+import { createClient } from "@supabase/supabase-js";
 
 const EIMUNISASI_SUPABASE_URL = Deno.env.get("EIMUNISASI_SUPABASE_URL");
 const EIMUNISASI_SUPABASE_SERVICE_ROLE_KEY = Deno.env.get(

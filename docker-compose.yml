@@ -1,0 +1,39 @@
+services:
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379"
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: outpost
+      POSTGRES_PASSWORD: outpost_password
+      POSTGRES_DB: outpost
+    ports:
+      - "5432"
+
+  outpost:
+    image: hookdeck/outpost:latest
+    ports:
+      - "3000:3000"
+      - "3333:3333"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - RABBITMQ_SERVER_URL=amqp://guest:guest@rabbitmq:5672/
+      - RABBITMQ_EXCHANGE=outpost
+      - AES_ENCRYPTION_SECRET=12345678901234567890123456789012
+      - POSTGRES_URL=postgres://outpost:outpost_password@postgres:5432/outpost?sslmode=disable
+      - API_KEY=test_api_key
+      - WEBHOOK_SECRET=test_webhook_secret
+    depends_on:
+      - redis
+      - rabbitmq
+      - postgres

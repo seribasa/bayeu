@@ -1,4 +1,4 @@
-import * as jose from "https://deno.land/x/jose@v4.14.4/index.ts";
+import * as jose from "jose";
 
 export function getAuthToken(authorization: string): string {
   const authHeader = authorization;

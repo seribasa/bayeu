@@ -1,18 +1,18 @@
 // deno-lint-ignore-file no-explicit-any
-import { assertEquals } from "jsr:@std/assert";
+import { assertEquals } from "@std/assert";
 import { handleInitiate } from "./initiate.ts";
-import { Context } from "jsr:@hono/hono";
-import { stub } from "jsr:@std/testing/mock";
+import { Context } from "hono";
+import { stub } from "@std/testing/mock";
 import { paymentSupabaseAdmin } from "../../_shared/paymentSupabase.ts";
 import { eImunisasiSupabaseAdmin } from "../../_shared/eimunisasiSupabase.ts";
 import * as gateway from "../gateways/stripe.ts";
 import * as midtrans from "../gateways/midtrans.ts";
-import Stripe from "npm:stripe@18.0.0";
+import Stripe from "stripe";
 
 stub(
   globalThis,
   "setTimeout",
-  (fn: () => void, _ms?: number, ..._args: any[]) => {
+  (fn: any, _ms?: number, ..._args: any[]) => {
     fn();
     return 0;
   },

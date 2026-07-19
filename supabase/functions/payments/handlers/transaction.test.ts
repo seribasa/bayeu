@@ -1,10 +1,10 @@
 // deno-lint-ignore-file no-explicit-any
-import { assertEquals } from "jsr:@std/assert";
+import { assertEquals } from "@std/assert";
 import { handleTransaction } from "./transaction.ts";
-import { Context } from "jsr:@hono/hono";
+import { Context } from "hono";
 import { eImunisasiSupabaseAdmin } from "../../_shared/eimunisasiSupabase.ts";
 import { paymentSupabaseAdmin } from "../../_shared/paymentSupabase.ts";
-import { stub } from "jsr:@std/testing/mock";
+import { stub } from "@std/testing/mock";
 
 Deno.test("handleTransaction - should return 401 when no authorization header", async () => {
   const mockContext = {

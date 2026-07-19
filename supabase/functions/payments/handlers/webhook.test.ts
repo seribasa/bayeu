@@ -1,8 +1,8 @@
 // deno-lint-ignore-file no-explicit-any
-import { assertEquals } from "jsr:@std/assert";
+import { assertEquals } from "@std/assert";
 import { handleWebhook } from "./webhook.ts";
-import { stub } from "jsr:@std/testing/mock";
-import { Context } from "jsr:@hono/hono";
+import { stub } from "@std/testing/mock";
+import { Context } from "hono";
 import { stripe } from "../gateways/stripe.ts";
 import { paymentSupabaseAdmin } from "../../_shared/paymentSupabase.ts";
 
@@ -86,6 +86,7 @@ Deno.test("handleWebhook - midtrans valid signature returns 200", async () => {
     (table: string) => {
       if (table === "payment_gateway") return gatewayQuery;
       if (table === "transactions") return transactionsQuery;
+      if (table === "orders") return { select: () => ({ eq: () => ({ single: () => Promise.resolve({ data: { metadata: { tenant_id: "test" } }, error: null }) }) }) };
       return {} as any;
     },
   );
@@ -189,6 +190,7 @@ Deno.test("handleWebhook - stripe valid signature returns 200", async () => {
     (table: string) => {
       if (table === "payment_gateway") return gatewayQuery;
       if (table === "transactions") return transactionsQuery;
+      if (table === "orders") return { select: () => ({ eq: () => ({ single: () => Promise.resolve({ data: { metadata: { tenant_id: "test" } }, error: null }) }) }) };
       return {} as any;
     },
   );

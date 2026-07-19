@@ -4,7 +4,17 @@
     "specifiers": ["stripe@18.0.0", "@supabase/realtime-js@2.11.2"]
   },
   "imports": {
-    "@std/testing": "jsr:@std/testing@^1.0.12"
+    "@hookdeck/outpost-sdk": "npm:@hookdeck/outpost-sdk@^1.4.1",
+    "@std/testing": "jsr:@std/testing@^1.0.12",
+    "@std/assert": "jsr:@std/assert@1",
+    "jose": "https://deno.land/x/jose@v4.14.4/index.ts",
+    "@supabase/supabase-js": "jsr:@supabase/supabase-js@2",
+    "stripe": "npm:stripe@18.0.0",
+    "midtrans-client": "npm:midtrans-client@1.4.2",
+    "hono": "jsr:@hono/hono",
+    "hono/logger": "jsr:@hono/hono/logger",
+    "hono/cors": "jsr:@hono/hono/cors",
+    "@supabase/postgrest-js": "npm:@supabase/postgrest-js@1.19.4"
   },
   "tasks": {
     "start": "deno run --allow-net --watch=static/,routes/,data/ dev.ts",

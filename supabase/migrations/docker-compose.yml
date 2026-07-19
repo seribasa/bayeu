@@ -1,0 +1,8 @@
+services:
+  dbmate:
+    image: amacneil/dbmate:latest
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-}
+    volumes:
+      - .:/db
+    command: up
