@@ -70,6 +70,23 @@ Deno.test("handleInitiatePayment - reuses active unexpired token", async () => {
   };
 
   const selectStub = stub(paymentSupabaseAdmin, "from", (table: string) => {
+    if (table === "tenants") {
+      return {
+        select: () => ({
+          eq: () => ({
+            maybeSingle: () => Promise.resolve({
+              data: {
+                default_success_url: "https://kuala.peltops.com/success",
+                default_failed_url: "https://kuala.peltops.com/failed",
+                default_cancel_url: "https://kuala.peltops.com/cancel",
+                webhook_url: "http://kuala-api:8080/webhook",
+              },
+              error: null,
+            }),
+          }),
+        }),
+      } as any;
+    }
     if (table === "orders") {
       return {
         select: () => {
@@ -97,6 +114,10 @@ Deno.test("handleInitiatePayment - reuses active unexpired token", async () => {
     json: (body: any, status?: number) => ({ body, status: status || 200 }),
   } as unknown as Context;
 
+  const fetchStub = stub(globalThis, "fetch", () =>
+    Promise.resolve(new Response(JSON.stringify([]), { status: 200 }))
+  );
+
   try {
     const res = await handleInitiatePayment(c);
     assertEquals((res as any).status, 200);
@@ -104,6 +125,7 @@ Deno.test("handleInitiatePayment - reuses active unexpired token", async () => {
     assertEquals((res as any).body.data.order_id, "ord-existing-123");
     assertEquals((res as any).body.data.token, "snap-existing-token");
   } finally {
+    fetchStub.restore();
     selectStub.restore();
   }
 });

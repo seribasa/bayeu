@@ -54,7 +54,7 @@ export async function handleInitiatePayment(c: Context) {
       return c.json({ is_successful: false, message: errorMessageBodyRequest }, 400);
     }
 
-    const { gateway, amount, tenant_id, metadata, webhook_url, customer_email, customer_name } = body;
+    const { gateway, amount, tenant_id, metadata, customer_email, customer_name } = body;
     const currency = gateway === "midtrans" ? "idr" : body.currency;
     const expiryMinutes = parseInt(Deno.env.get("PAYMENT_EXPIRY_MINUTES") || "1440", 10);
 
@@ -85,10 +85,18 @@ export async function handleInitiatePayment(c: Context) {
       userId = "anonymous";
     }
 
-    if (webhook_url) {
+    // Fetch tenant configuration from tenants database table
+    const { data: tenantConfig } = await paymentSupabaseAdmin
+      .from("tenants")
+      .select("default_success_url, default_failed_url, default_cancel_url, webhook_url")
+      .eq("tenant_id", tenant_id)
+      .maybeSingle();
+
+    const effectiveWebhookUrl = tenantConfig?.webhook_url;
+    if (effectiveWebhookUrl) {
       try {
         const { upsertOutpostDestination } = await import("../helpers/outpost.ts");
-        await upsertOutpostDestination(tenant_id, webhook_url);
+        await upsertOutpostDestination(tenant_id, effectiveWebhookUrl);
       } catch (e) {
         console.error("Failed to upsert destination:", e);
       }
@@ -140,18 +148,16 @@ export async function handleInitiatePayment(c: Context) {
       }
     }
 
-    const tenantIdUpper = (tenant_id || "").toUpperCase();
-
     const resolvedSuccessUrl = body.success_url ||
-      Deno.env.get(`TENANT_${tenantIdUpper}_SUCCESS_URL`) ||
+      tenantConfig?.default_success_url ||
       Deno.env.get("DEFAULT_SUCCESS_URL");
 
     const resolvedFailedUrl = body.failed_url ||
-      Deno.env.get(`TENANT_${tenantIdUpper}_FAILED_URL`) ||
+      tenantConfig?.default_failed_url ||
       Deno.env.get("DEFAULT_FAILED_URL");
 
     const resolvedCancelUrl = body.cancel_url || body.back_url ||
-      Deno.env.get(`TENANT_${tenantIdUpper}_CANCEL_URL`) ||
+      tenantConfig?.default_cancel_url ||
       Deno.env.get("DEFAULT_CANCEL_URL");
 
     if (!resolvedSuccessUrl) {
