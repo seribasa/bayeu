@@ -1,7 +1,7 @@
 import { Context } from "hono";
 import { paymentSupabaseAdmin } from "../../_shared/paymentSupabase.ts";
 import { getAuthToken } from "../../_shared/jwtHelper.ts";
-import { createStripeIntent } from "../gateways/stripe.ts";
+import { createStripeCheckout } from "../gateways/stripe.ts";
 import { createSnapMidtrans } from "../gateways/midtrans.ts";
 
 async function rollbackOrder(orderId: string, maxRetries = 3) {
@@ -27,8 +27,8 @@ function validateBody(body: any): string | null {
   if (!body.gateway) return "Payment gateway is required";
   if (body.gateway !== "stripe" && body.gateway !== "midtrans") return "Payment gateway not supported yet";
   if (body.gateway == "stripe" && !body.currency) return "Currency is required";
-if (!body.amount) return "Amount is required";
-if (typeof body.amount !== "number" || body.amount <= 0) return "Amount must be a positive number";
+  if (!body.amount) return "Amount is required";
+  if (typeof body.amount !== "number" || body.amount <= 0) return "Amount must be a positive number";
   if (!body.tenant_id) return "Tenant ID is required";
   return null;
 }
@@ -71,15 +71,59 @@ export async function handleInitiatePayment(c: Context) {
 
     const { gateway, amount, tenant_id, metadata, webhook_url } = body;
     const currency = gateway === "midtrans" ? "idr" : body.currency;
+    const expiryMinutes = parseInt(Deno.env.get("PAYMENT_EXPIRY_MINUTES") || "1440", 10);
 
-if (webhook_url) {
-  try {
-    const { upsertOutpostDestination } = await import("../helpers/outpost.ts");
-    await upsertOutpostDestination(tenant_id, webhook_url);
-  } catch (e) {
-    console.error("Failed to upsert destination:", e);
-  }
-}
+    if (webhook_url) {
+      try {
+        const { upsertOutpostDestination } = await import("../helpers/outpost.ts");
+        await upsertOutpostDestination(tenant_id, webhook_url);
+      } catch (e) {
+        console.error("Failed to upsert destination:", e);
+      }
+    }
+
+    // Check for existing pending order for this tenant and invoice
+    if (metadata?.invoice_id) {
+      const { data: existingOrders } = await paymentSupabaseAdmin
+        .from("orders")
+        .select("order_id, gateway, gateway_response, created_at, status, metadata")
+        .eq("user_id", userId)
+        .eq("gateway", gateway)
+        .not("status", "in", '("settlement","capture","paid","expire","cancel")');
+
+      if (existingOrders && existingOrders.length > 0) {
+        // deno-lint-ignore no-explicit-any
+        const matchingOrder = existingOrders.find((o: any) =>
+          o.metadata?.invoice_id === metadata.invoice_id &&
+          o.metadata?.tenant_id === tenant_id &&
+          o.gateway_response &&
+          o.gateway_response.token
+        );
+
+        if (matchingOrder) {
+          const createdAt = new Date(matchingOrder.created_at).getTime();
+          const isUnexpired = (createdAt + expiryMinutes * 60 * 1000) > Date.now();
+
+          if (isUnexpired) {
+            return c.json({
+              is_successful: true,
+              data: {
+                order_id: matchingOrder.order_id,
+                gateway: matchingOrder.gateway,
+                token: matchingOrder.gateway_response.token,
+                redirect_url: matchingOrder.gateway_response.redirect_url,
+              },
+            });
+          } else {
+            // Mark expired order
+            await paymentSupabaseAdmin
+              .from("orders")
+              .update({ status: "expire", updated_at: new Date() })
+              .eq("order_id", matchingOrder.order_id);
+          }
+        }
+      }
+    }
 
     const { data: orderData, error: orderError } = await paymentSupabaseAdmin
       .from("orders")
@@ -106,11 +150,12 @@ if (webhook_url) {
 
     if (gateway === "stripe") {
       try {
-        response = await createStripeIntent({
+        response = await createStripeCheckout({
           orderId,
           amount,
           currency,
-          customerId: userId,
+          webhookUrl: webhook_url,
+          expiryMinutes,
         });
       } catch (error) {
         await rollbackOrder(orderId);
@@ -124,6 +169,7 @@ if (webhook_url) {
           totalAmount: amount,
           customerName: name,
           customerEmail: email,
+          expiryMinutes,
         });
       } catch (error) {
         await rollbackOrder(orderId);
@@ -148,7 +194,12 @@ if (webhook_url) {
 
     return c.json({
       is_successful: true,
-      data: response,
+      data: {
+        order_id: orderId,
+        gateway: gateway,
+        token: response?.token,
+        redirect_url: response?.redirect_url,
+      },
     });
   } catch (error) {
     console.error("Initiate Payment Error:", error);

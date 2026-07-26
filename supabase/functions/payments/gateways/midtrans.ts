@@ -32,18 +32,32 @@ const snap = new Midtrans.Snap({
   clientKey: MIDTRANS_CLIENT_KEY,
 });
 
+function getSnapDate(): string {
+  const date = new Date();
+  const yyyy = date.getFullYear();
+  const MM = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  const hh = String(date.getHours()).padStart(2, "0");
+  const mm = String(date.getMinutes()).padStart(2, "0");
+  const ss = String(date.getSeconds()).padStart(2, "0");
+  return `${yyyy}-${MM}-${dd} ${hh}:${mm}:${ss} +0700`;
+}
+
 async function createSnapMidtrans({
   orderId,
   totalAmount,
   customerName,
   customerEmail,
+  expiryMinutes,
 }: {
   orderId: string;
   totalAmount: number;
   customerName: string;
   customerEmail?: string;
+  expiryMinutes?: number;
 }): Promise<CreatePaymentResponse> {
-  const parameter = {
+  // deno-lint-ignore no-explicit-any
+  const parameter: any = {
     transaction_details: {
       order_id: orderId,
       gross_amount: totalAmount,
@@ -62,6 +76,14 @@ async function createSnapMidtrans({
       error: "https://eimunisasi-app.peltops.com/payment/midtrans/error",
     },
   };
+
+  if (expiryMinutes && expiryMinutes > 0) {
+    parameter.expiry = {
+      start_time: getSnapDate(),
+      unit: "minutes",
+      duration: expiryMinutes,
+    };
+  }
 
   try {
     const transaction = await snap.createTransaction(parameter);

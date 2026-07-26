@@ -61,6 +61,58 @@ async function createStripeIntent({
   }
 }
 
+async function createStripeCheckout({
+  orderId,
+  amount,
+  currency,
+  webhookUrl,
+  expiryMinutes = 1440,
+}: {
+  orderId: string;
+  amount: number;
+  currency: string;
+  webhookUrl?: string;
+  expiryMinutes?: number;
+}): Promise<CreatePaymentResponse> {
+  try {
+    const amountInCents = Math.round(amount * 100);
+    const expiresAt = Math.floor(Date.now() / 1000) + Math.round(expiryMinutes * 60);
+
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      currency,
+      line_items: [
+        {
+          price_data: {
+            currency,
+            product_data: { name: `Invoice Order ${orderId}` },
+            unit_amount: amountInCents,
+          },
+          quantity: 1,
+        },
+      ],
+      metadata: {
+        order_id: orderId,
+      },
+      success_url: webhookUrl || "https://kuala-app.peltops.com/payment/success",
+      cancel_url: "https://kuala-app.peltops.com/payment/cancel",
+      expires_at: expiresAt,
+    });
+
+    const response: CreatePaymentResponse = {
+      order_id: orderId,
+      gateway: "stripe",
+      redirect_url: session.url || undefined,
+      token: session.id,
+    };
+
+    return response;
+  } catch (error) {
+    console.error("Error creating Stripe checkout session:", error);
+    throw error;
+  }
+}
+
 // deno-lint-ignore no-explicit-any
 async function verifyStripeSignature(sig: string, body: any) {
   try {
@@ -194,4 +246,10 @@ async function handleStripeWebhook(event: any) {
   }
 }
 
-export { stripe, createStripeIntent, verifyStripeSignature, handleStripeWebhook };
+export {
+  createStripeCheckout,
+  createStripeIntent,
+  handleStripeWebhook,
+  stripe,
+  verifyStripeSignature,
+};
