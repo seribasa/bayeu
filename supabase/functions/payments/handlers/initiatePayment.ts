@@ -35,33 +35,10 @@ function validateBody(body: any): string | null {
 
 export async function handleInitiatePayment(c: Context) {
   try {
-    const authHeader = c.req.header("Authorization");
+    const authHeader = c.req.header("Authorization") || c.req.header("apikey");
     if (!authHeader) {
       return c.json({ is_successful: false, message: "Missing authorization header" }, 401);
     }
-    const token = getAuthToken(authHeader);
-
-    // Validate the token to get the user ID
-    let userId: string;
-    let name: string = "Customer";
-    let email: string = "";
-    
-    try {
-      // Just decode the token, don't verify against DB since it's from a tenant
-      const base64Url = token.split(".")[1];
-      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-      const jsonPayload = decodeURIComponent(atob(base64).split("").map(function(c) {
-          return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
-      }).join(""));
-      const decoded = JSON.parse(jsonPayload);
-      userId = decoded.sub;
-      email = decoded.email || "";
-      name = decoded.user_metadata?.full_name || "Customer";
-    } catch (e) {
-      console.error("JWT Decode error:", e);
-      return c.json({ is_successful: false, message: "Unauthorized: Invalid token format" }, 401);
-    }
-
     const body = await c.req.json();
     const errorMessageBodyRequest = validateBody(body);
 
@@ -69,9 +46,36 @@ export async function handleInitiatePayment(c: Context) {
       return c.json({ is_successful: false, message: errorMessageBodyRequest }, 400);
     }
 
-    const { gateway, amount, tenant_id, metadata, webhook_url } = body;
+    const { gateway, amount, tenant_id, metadata, webhook_url, customer_email, customer_name } = body;
     const currency = gateway === "midtrans" ? "idr" : body.currency;
     const expiryMinutes = parseInt(Deno.env.get("PAYMENT_EXPIRY_MINUTES") || "1440", 10);
+
+    let userId: string = body.user_id || body.customer_id;
+    let email: string = customer_email || body.email || "";
+    let name: string = customer_name || body.name || "Customer";
+
+    if (!userId && authHeader) {
+      try {
+        const token = getAuthToken(authHeader);
+        const base64Url = token.split(".")[1];
+        if (base64Url) {
+          const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+          const jsonPayload = decodeURIComponent(atob(base64).split("").map(function(c) {
+              return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
+          }).join(""));
+          const decoded = JSON.parse(jsonPayload);
+          userId = decoded.sub;
+          email = email || decoded.email || "";
+          name = name || decoded.user_metadata?.full_name || "Customer";
+        }
+      } catch (e) {
+        console.error("JWT Decode fallback error:", e);
+      }
+    }
+
+    if (!userId) {
+      userId = "anonymous";
+    }
 
     if (webhook_url) {
       try {
