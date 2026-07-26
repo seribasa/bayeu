@@ -82,7 +82,10 @@ export async function handleInitiatePayment(c: Context) {
     }
 
     if (!userId) {
-      userId = "anonymous";
+      return c.json({
+        is_successful: false,
+        message: "Missing required parameter: user_id or customer_id",
+      }, 400);
     }
 
     // Fetch tenant configuration from tenants database table
