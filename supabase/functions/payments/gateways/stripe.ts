@@ -212,7 +212,7 @@ async function handleStripeWebhook(event: any) {
 
     const metadata = rpcResult?.metadata || order.metadata;
 
-    if (txStatus === TransactionStatusEnum.success && metadata?.tenant_id) {
+    if (txStatus === TransactionStatusEnum.success && metadata?.tenant_id && !rpcResult?.already_paid) {
       await publishPaymentEvent(metadata.tenant_id, {
         order_id: orderId,
         status: "success",
