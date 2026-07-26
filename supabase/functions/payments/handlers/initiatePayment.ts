@@ -107,6 +107,7 @@ export async function handleInitiatePayment(c: Context) {
       const { data: existingOrders, error: findError } = await paymentSupabaseAdmin
         .from("orders")
         .select("order_id, gateway, gateway_response, created_at, status, metadata")
+        .eq("user_id", userId)
         .eq("gateway", gateway)
         .eq("metadata->>invoice_id", String(metadata.invoice_id))
         .eq("metadata->>tenant_id", String(tenant_id))
@@ -148,17 +149,34 @@ export async function handleInitiatePayment(c: Context) {
       }
     }
 
-    const resolvedSuccessUrl = body.success_url ||
-      tenantConfig?.default_success_url ||
-      Deno.env.get("DEFAULT_SUCCESS_URL");
+    const defaultSuccess = tenantConfig?.default_success_url || Deno.env.get("DEFAULT_SUCCESS_URL");
+    const defaultFailed = tenantConfig?.default_failed_url || Deno.env.get("DEFAULT_FAILED_URL");
+    const defaultCancel = tenantConfig?.default_cancel_url || Deno.env.get("DEFAULT_CANCEL_URL");
 
-    const resolvedFailedUrl = body.failed_url ||
-      tenantConfig?.default_failed_url ||
-      Deno.env.get("DEFAULT_FAILED_URL");
+    const isSameOrigin = (customUrl?: string, allowedUrl?: string): boolean => {
+      if (!customUrl) return false;
+      if (!allowedUrl) return true;
+      try {
+        const custom = new URL(customUrl);
+        const allowed = new URL(allowedUrl);
+        return custom.hostname === allowed.hostname;
+      } catch {
+        return false;
+      }
+    };
 
-    const resolvedCancelUrl = body.cancel_url || body.back_url ||
-      tenantConfig?.default_cancel_url ||
-      Deno.env.get("DEFAULT_CANCEL_URL");
+    const resolvedSuccessUrl = isSameOrigin(body.success_url, defaultSuccess)
+      ? body.success_url!
+      : defaultSuccess;
+
+    const resolvedFailedUrl = isSameOrigin(body.failed_url, defaultFailed)
+      ? body.failed_url!
+      : defaultFailed;
+
+    const customCancel = body.cancel_url || body.back_url;
+    const resolvedCancelUrl = isSameOrigin(customCancel, defaultCancel)
+      ? customCancel!
+      : defaultCancel;
 
     if (!resolvedSuccessUrl) {
       return c.json({ is_successful: false, message: "Missing required redirect URL: success_url" }, 400);
