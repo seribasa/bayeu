@@ -171,11 +171,6 @@ async function handleStripeWebhook(event: any) {
       return;
     }
 
-    if (event.type === "checkout.session.completed" && data.payment_status !== "paid") {
-      console.log("checkout.session.completed but payment_status is not paid, skipping:", data.payment_status);
-      return;
-    }
-
     const txStatus = mapStripeToEnum(event.type);
     const { paymentStatus, orderStatus } = mapTransactionToStatus(txStatus);
 
@@ -190,14 +185,12 @@ async function handleStripeWebhook(event: any) {
       return;
     }
 
-    const orderAmount = data.amount_total ? data.amount_total / 100 : (data.amount ? data.amount / 100 : order.total_amount);
-
     const { data: rpcResult, error: rpcError } = await paymentSupabaseAdmin.rpc("process_payment_webhook", {
       p_order_id: orderId,
       p_gateway_name: "stripe",
       p_gateway_payment_id: data.id,
       p_gateway_transaction_id: data.id,
-      p_amount: orderAmount,
+      p_amount: order.total_amount,
       p_currency: (data.currency || "idr").toLowerCase(),
       p_payment_status: paymentStatus,
       p_transaction_status: txStatus,
