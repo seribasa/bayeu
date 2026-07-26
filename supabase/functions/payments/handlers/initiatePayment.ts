@@ -84,18 +84,21 @@ export async function handleInitiatePayment(c: Context) {
 
     // Check for existing pending order for this tenant and invoice
     if (metadata?.invoice_id) {
-      const { data: existingOrders } = await paymentSupabaseAdmin
+      const { data: existingOrders, error: findError } = await paymentSupabaseAdmin
         .from("orders")
         .select("order_id, gateway, gateway_response, created_at, status, metadata")
-        .eq("user_id", userId)
         .eq("gateway", gateway)
-        .not("status", "in", '("settlement","capture","paid","expire","cancel")');
+        .eq("metadata->>invoice_id", String(metadata.invoice_id))
+        .eq("metadata->>tenant_id", String(tenant_id))
+        .not("status::text", "in", "(paid,cancelled,failed,refunded,expire)");
+
+      if (findError) {
+        console.error("Error searching existing orders:", findError);
+      }
 
       if (existingOrders && existingOrders.length > 0) {
         // deno-lint-ignore no-explicit-any
         const matchingOrder = existingOrders.find((o: any) =>
-          o.metadata?.invoice_id === metadata.invoice_id &&
-          o.metadata?.tenant_id === tenant_id &&
           o.gateway_response &&
           o.gateway_response.token
         );
@@ -130,6 +133,7 @@ export async function handleInitiatePayment(c: Context) {
       .insert({
         user_id: userId,
         total_amount: amount,
+        currency: currency,
         status: "none",
         gateway: gateway,
         metadata: {

@@ -72,13 +72,12 @@ Deno.test("handleInitiatePayment - reuses active unexpired token", async () => {
   const selectStub = stub(paymentSupabaseAdmin, "from", (table: string) => {
     if (table === "orders") {
       return {
-        select: () => ({
-          eq: () => ({
-            eq: () => ({
-              not: () => Promise.resolve({ data: [mockExistingOrder], error: null }),
-            }),
-          }),
-        }),
+        select: () => {
+          const query: any = {};
+          query.eq = () => query;
+          query.not = () => Promise.resolve({ data: [mockExistingOrder], error: null });
+          return query;
+        },
       } as any;
     }
     return {} as any;
