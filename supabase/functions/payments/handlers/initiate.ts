@@ -1,4 +1,4 @@
-import { Context } from "hono";
+import { Context } from "jsr:@hono/hono";
 import { eImunisasiSupabaseAdmin } from "../../_shared/eimunisasiSupabase.ts";
 import { paymentSupabaseAdmin } from "../../_shared/paymentSupabase.ts";
 import { getAuthToken } from "../../_shared/jwtHelper.ts";

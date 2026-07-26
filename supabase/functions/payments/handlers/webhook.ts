@@ -1,4 +1,4 @@
-import { Context } from "hono";
+import { Context } from "jsr:@hono/hono";
 import {
   handleMidtransWebhook,
   verifyMidtransSignature,
