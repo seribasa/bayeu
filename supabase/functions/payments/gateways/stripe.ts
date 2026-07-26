@@ -3,6 +3,7 @@ import { paymentSupabaseAdmin } from "../../_shared/paymentSupabase.ts";
 import {
   mapStripeToEnum,
   mapTransactionToStatus,
+  TransactionStatusEnum,
 } from "../helpers/paymentHelper.ts";
 import { publishPaymentEvent } from "../helpers/outpost.ts";
 import { CreatePaymentResponse } from "../../_shared/types/createPaymentResponse.ts";
@@ -170,168 +171,53 @@ async function handleStripeWebhook(event: any) {
       return;
     }
 
-    const txStatus = mapStripeToEnum(event.type);
-    const { paymentStatus } = mapTransactionToStatus(txStatus);
+    if (event.type === "checkout.session.completed" && data.payment_status !== "paid") {
+      console.log("checkout.session.completed but payment_status is not paid, skipping:", data.payment_status);
+      return;
+    }
 
-    const { data: gateway } = await paymentSupabaseAdmin
-      .from("payment_gateway")
-      .select("gateway_id")
-      .eq("name", "stripe")
+    const txStatus = mapStripeToEnum(event.type);
+    const { paymentStatus, orderStatus } = mapTransactionToStatus(txStatus);
+
+    const { data: order } = await paymentSupabaseAdmin
+      .from("orders")
+      .select("total_amount, metadata")
+      .eq("order_id", orderId)
       .single();
 
-    if (!gateway) {
-      throw new Error("Payment gateway not found");
-    }
-
-    // 1. payment_intent.created
-    if (event.type === "payment_intent.created") {
-      const { data: existingPayment } = await paymentSupabaseAdmin
-        .from("payments")
-        .select("payment_id")
-        .eq("order_id", orderId)
-        .maybeSingle();
-
-      if (!existingPayment) {
-        const { data: order } = await paymentSupabaseAdmin
-          .from("orders")
-          .select("total_amount")
-          .eq("order_id", orderId)
-          .single();
-
-        if (order) {
-          const { data: payment } = await paymentSupabaseAdmin
-            .from("payments")
-            .insert({
-              gateway_payment_id: data.id,
-              order_id: orderId,
-              gateway_id: gateway.gateway_id,
-              amount: order.total_amount,
-              currency: (data.currency || "idr").toLowerCase(),
-              status: paymentStatus,
-            })
-            .select("payment_id")
-            .single();
-
-          if (payment) {
-            await paymentSupabaseAdmin.from("transactions").insert({
-              payment_id: payment.payment_id,
-              gateway_transaction_id: data.id,
-              gateway_response: data,
-              status: txStatus,
-            });
-          }
-        }
-      }
+    if (!order) {
+      console.error(`Order ${orderId} not found for Stripe webhook`);
       return;
     }
 
-    // 2. checkout.session.completed OR payment_intent.succeeded
-    if (
-      event.type === "checkout.session.completed" ||
-      event.type === "payment_intent.succeeded" ||
-      event.type === "checkout.session.async_payment_succeeded"
-    ) {
-      if (event.type === "checkout.session.completed" && data.payment_status !== "paid") {
-        console.log("checkout.session.completed but payment_status is not paid, skipping:", data.payment_status);
-        return;
-      }
+    const orderAmount = data.amount_total ? data.amount_total / 100 : (data.amount ? data.amount / 100 : order.total_amount);
 
-      const { data: existingPayment } = await paymentSupabaseAdmin
-        .from("payments")
-        .select("payment_id")
-        .eq("order_id", orderId)
-        .maybeSingle();
+    const { data: rpcResult, error: rpcError } = await paymentSupabaseAdmin.rpc("process_payment_webhook", {
+      p_order_id: orderId,
+      p_gateway_name: "stripe",
+      p_gateway_payment_id: data.id,
+      p_gateway_transaction_id: data.id,
+      p_amount: orderAmount,
+      p_currency: (data.currency || "idr").toLowerCase(),
+      p_payment_status: paymentStatus,
+      p_transaction_status: txStatus,
+      p_order_status: orderStatus,
+      p_gateway_response: data,
+    });
 
-      if (!existingPayment) {
-        const { data: order } = await paymentSupabaseAdmin
-          .from("orders")
-          .select("total_amount")
-          .eq("order_id", orderId)
-          .single();
-
-        if (order) {
-          const { data: payment } = await paymentSupabaseAdmin
-            .from("payments")
-            .insert({
-              gateway_payment_id: data.id,
-              order_id: orderId,
-              gateway_id: gateway.gateway_id,
-              amount: order.total_amount,
-              currency: (data.currency || data.currency_options?.idr || "idr").toLowerCase(),
-              status: paymentStatus,
-            })
-            .select("payment_id")
-            .single();
-
-          if (payment) {
-            await paymentSupabaseAdmin.from("transactions").insert({
-              payment_id: payment.payment_id,
-              gateway_transaction_id: data.id,
-              gateway_response: data,
-              status: txStatus,
-            });
-          }
-        }
-      } else {
-        await paymentSupabaseAdmin
-          .from("payments")
-          .update({ status: paymentStatus, updated_at: new Date() })
-          .eq("order_id", orderId);
-
-        await paymentSupabaseAdmin
-          .from("transactions")
-          .update({ status: txStatus, gateway_response: data, updated_at: new Date() })
-          .eq("payment_id", existingPayment.payment_id);
-      }
-
-      // Update order status to settlement
-      await paymentSupabaseAdmin
-        .from("orders")
-        .update({ status: "settlement", updated_at: new Date() })
-        .eq("order_id", orderId);
-
-      // Publish Outpost Event
-      const { data: order } = await paymentSupabaseAdmin
-        .from("orders")
-        .select("metadata")
-        .eq("order_id", orderId)
-        .single();
-
-      if (order?.metadata?.tenant_id) {
-        await publishPaymentEvent(order.metadata.tenant_id, {
-          order_id: orderId,
-          status: "success",
-          metadata: order.metadata,
-        });
-      }
-      return;
+    if (rpcError) {
+      console.error("RPC Error processing Stripe webhook:", rpcError);
+      throw rpcError;
     }
 
-    // 3. checkout.session.expired
-    if (event.type === "checkout.session.expired") {
-      await paymentSupabaseAdmin
-        .from("orders")
-        .update({ status: "expire", updated_at: new Date() })
-        .eq("order_id", orderId);
+    const metadata = rpcResult?.metadata || order.metadata;
 
-      const { data: existingPayment } = await paymentSupabaseAdmin
-        .from("payments")
-        .select("payment_id")
-        .eq("order_id", orderId)
-        .maybeSingle();
-
-      if (existingPayment) {
-        await paymentSupabaseAdmin
-          .from("payments")
-          .update({ status: paymentStatus, updated_at: new Date() })
-          .eq("payment_id", existingPayment.payment_id);
-
-        await paymentSupabaseAdmin
-          .from("transactions")
-          .update({ status: txStatus, updated_at: new Date() })
-          .eq("payment_id", existingPayment.payment_id);
-      }
-      return;
+    if (txStatus === TransactionStatusEnum.success && metadata?.tenant_id) {
+      await publishPaymentEvent(metadata.tenant_id, {
+        order_id: orderId,
+        status: "success",
+        metadata: metadata,
+      });
     }
   } catch (error) {
     console.error("Error handling Stripe webhook:", error);

@@ -80,13 +80,18 @@ Deno.test("handleWebhook - midtrans valid signature returns 200", async () => {
         }),
     }),
   };
+  const rpcStub = stub(
+    paymentSupabaseAdmin,
+    "rpc",
+    () => Promise.resolve({ data: { success: true, metadata: { tenant_id: "test" } }, error: null }) as any,
+  );
   const fromStub = stub(
     paymentSupabaseAdmin,
     "from",
     (table: string) => {
       if (table === "payment_gateway") return gatewayQuery;
       if (table === "transactions") return transactionsQuery;
-      if (table === "orders") return { select: () => ({ eq: () => ({ single: () => Promise.resolve({ data: { metadata: { tenant_id: "test" } }, error: null }) }) }) };
+      if (table === "orders") return { select: () => ({ eq: () => ({ single: () => Promise.resolve({ data: { total_amount: 100, metadata: { tenant_id: "test" } }, error: null }) }) }) };
       return {} as any;
     },
   );
@@ -115,6 +120,7 @@ Deno.test("handleWebhook - midtrans valid signature returns 200", async () => {
     assertEquals(res.data.is_successful, true);
     assertEquals(res.data.message, "Midtrans webhook processed");
   } finally {
+    rpcStub.restore();
     fromStub.restore();
   }
 });
@@ -210,6 +216,11 @@ Deno.test("handleWebhook - stripe valid signature returns 200", async () => {
       eq: () => Promise.resolve({ data: [], error: null }),
     }),
   };
+  const rpcStub = stub(
+    paymentSupabaseAdmin,
+    "rpc",
+    () => Promise.resolve({ data: { success: true, metadata: { tenant_id: "test" } }, error: null }) as any,
+  );
   const fromStub = stub(
     paymentSupabaseAdmin,
     "from",
@@ -239,6 +250,7 @@ Deno.test("handleWebhook - stripe valid signature returns 200", async () => {
     assertEquals(res.data.is_successful, true);
     assertEquals(res.data.message, "Stripe webhook processed");
   } finally {
+    rpcStub.restore();
     stripeStub.restore();
     fromStub.restore();
   }

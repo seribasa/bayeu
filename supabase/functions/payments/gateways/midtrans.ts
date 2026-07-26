@@ -3,6 +3,7 @@ import { paymentSupabaseAdmin } from "../../_shared/paymentSupabase.ts";
 import {
   mapMidtransToEnum,
   mapTransactionToStatus,
+  TransactionStatusEnum,
 } from "../helpers/paymentHelper.ts";
 import { publishPaymentEvent } from "../helpers/outpost.ts";
 import { CreatePaymentResponse } from "../../_shared/types/createPaymentResponse.ts";
@@ -127,104 +128,54 @@ function verifyMidtransSignature({
 // deno-lint-ignore no-explicit-any
 async function handleMidtransWebhook(data: any) {
   try {
-    const { order_id, transaction_status, transaction_id, currency } = data;
-    // EVENT:
-    // capture
-    // Transaction is successful and card balance is captured successfully.
-    // settlement
-    // The transaction is successfully settled. Funds have been credited to your account.
-    // pending
-    // The transaction is created and is waiting to be paid by the customer at the payment providers like Bank Transfer, E-Wallet, and so on. For card payment method: waiting for customer to complete (and card issuer to validate) 3DS/OTP process.
-    // deny
-    // The credentials used for payment are rejected by the payment provider or Midtrans Fraud Detection System (FDS).
-    // cancel
-    // The transaction is canceled. It can be triggered by merchant.
-    // expire
-    // Transaction is not available for processing, because the payment was delayed.
-    // failure
-    // Unexpected error occurred during transaction processing.
-    // refund
-    // Transaction is marked to be refunded. Refund status can be triggered by merchant.
-    // partial_refund
-    // Transaction is marked to be refunded partially (if you choose to refund in amount less than the paid amount). Refund status can be triggered by merchant.
-    // authorize
-    // Only available specifically only if you are using pre-authorize feature for card transactions (an advanced feature that you will not have by default, so in most cases are safe to ignore). Transaction is successful and card balance is reserved (authorized) successfully. You can later perform API “capture” to change it into capture, or if no action is taken will be auto released. Depending on your business use case, you may assume authorize status as a successful transaction.
-
-    const txStatus = mapMidtransToEnum(transaction_status);
-    const { paymentStatus } = mapTransactionToStatus(txStatus);
-
-    const { data: gateway } = await paymentSupabaseAdmin
-      .from("payment_gateway")
-      .select("gateway_id")
-      .eq("name", "midtrans")
-      .single();
-
-    if (!gateway) {
-      throw new Error("Payment gateway not found");
-    }
-
-    if (transaction_status === "pending") {
-      const { data: order, error: errorOrder } = await paymentSupabaseAdmin
-        .from("orders")
-        .select("total_amount")
-        .eq("order_id", order_id)
-        .single();
-
-      if (errorOrder) {
-        console.error(errorOrder);
-        throw new Error("Order not found");
-      }
-
-      const { data: payment, error: errorPayment } = await paymentSupabaseAdmin
-        .from("payments")
-        .insert({
-          gateway_payment_id: transaction_id,
-          order_id,
-          gateway_id: gateway.gateway_id,
-          amount: order.total_amount,
-          currency: currency.toLowerCase(),
-          status: paymentStatus,
-        })
-        .select()
-        .single();
-
-      if (errorPayment) {
-        console.error(errorPayment);
-        throw new Error("Failed to create payment");
-      }
-
-      await paymentSupabaseAdmin.from("transactions").insert({
-        payment_id: payment.payment_id,
-        gateway_transaction_id: transaction_id,
-        gateway_response: data,
-        status: txStatus,
-      });
+    const { order_id, transaction_status, transaction_id, currency, gross_amount } = data;
+    if (!order_id) {
+      console.log("Midtrans webhook missing order_id, skipping");
       return;
     }
 
-    await paymentSupabaseAdmin
-      .from("transactions")
-      .update({
-        status: txStatus,
-        gateway_response: data,
-        updated_at: new Date(),
-      })
-      .eq("gateway_transaction_id", transaction_id);
+    const txStatus = mapMidtransToEnum(transaction_status);
+    const { paymentStatus, orderStatus } = mapTransactionToStatus(txStatus);
 
-    if (transaction_status === "capture" || transaction_status === "settlement") {
-      const { data: order } = await paymentSupabaseAdmin
-        .from("orders")
-        .select("metadata")
-        .eq("order_id", order_id)
-        .single();
+    const { data: order } = await paymentSupabaseAdmin
+      .from("orders")
+      .select("total_amount, metadata")
+      .eq("order_id", order_id)
+      .single();
 
-      if (order?.metadata?.tenant_id) {
-        await publishPaymentEvent(order.metadata.tenant_id, {
-          order_id: order_id,
-          status: "success",
-          metadata: order.metadata,
-        });
-      }
+    if (!order) {
+      console.error(`Order ${order_id} not found for Midtrans webhook`);
+      return;
+    }
+
+    const amount = gross_amount ? parseFloat(gross_amount) : order.total_amount;
+
+    const { data: rpcResult, error: rpcError } = await paymentSupabaseAdmin.rpc("process_payment_webhook", {
+      p_order_id: order_id,
+      p_gateway_name: "midtrans",
+      p_gateway_payment_id: transaction_id || order_id,
+      p_gateway_transaction_id: transaction_id || order_id,
+      p_amount: amount,
+      p_currency: (currency || "idr").toLowerCase(),
+      p_payment_status: paymentStatus,
+      p_transaction_status: txStatus,
+      p_order_status: orderStatus,
+      p_gateway_response: data,
+    });
+
+    if (rpcError) {
+      console.error("RPC Error processing Midtrans webhook:", rpcError);
+      throw rpcError;
+    }
+
+    const metadata = rpcResult?.metadata || order.metadata;
+
+    if (txStatus === TransactionStatusEnum.success && metadata?.tenant_id) {
+      await publishPaymentEvent(metadata.tenant_id, {
+        order_id: order_id,
+        status: "success",
+        metadata: metadata,
+      });
     }
   } catch (error) {
     console.error("Error handling Midtrans webhook:", error);
