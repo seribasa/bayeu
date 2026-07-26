@@ -57,6 +57,7 @@ async function createSnapMidtrans({
   customerEmail?: string;
   expiryMinutes?: number;
 }): Promise<CreatePaymentResponse> {
+  const bayeuPublicUrl = Deno.env.get("SUPABASE_PUBLIC_URL") || "https://bayeu.peltops.com/functions/v1/payments";
   // deno-lint-ignore no-explicit-any
   const parameter: any = {
     transaction_details: {
@@ -72,9 +73,9 @@ async function createSnapMidtrans({
       secure: true,
     },
     callbacks: {
-      finish: "https://eimunisasi-app.peltops.com/payment/midtrans/finish",
-      unfinish: "https://eimunisasi-app.peltops.com/payment/midtrans/unfinish",
-      error: "https://eimunisasi-app.peltops.com/payment/midtrans/error",
+      finish: `${bayeuPublicUrl}/redirect?order_id=${orderId}&event=success`,
+      unfinish: `${bayeuPublicUrl}/redirect?order_id=${orderId}&event=cancel`,
+      error: `${bayeuPublicUrl}/redirect?order_id=${orderId}&event=failed`,
     },
   };
 

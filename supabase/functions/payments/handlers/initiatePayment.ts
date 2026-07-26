@@ -140,6 +140,30 @@ export async function handleInitiatePayment(c: Context) {
       }
     }
 
+    const tenantIdUpper = (tenant_id || "").toUpperCase();
+
+    const resolvedSuccessUrl = body.success_url ||
+      Deno.env.get(`TENANT_${tenantIdUpper}_SUCCESS_URL`) ||
+      Deno.env.get("DEFAULT_SUCCESS_URL");
+
+    const resolvedFailedUrl = body.failed_url ||
+      Deno.env.get(`TENANT_${tenantIdUpper}_FAILED_URL`) ||
+      Deno.env.get("DEFAULT_FAILED_URL");
+
+    const resolvedCancelUrl = body.cancel_url || body.back_url ||
+      Deno.env.get(`TENANT_${tenantIdUpper}_CANCEL_URL`) ||
+      Deno.env.get("DEFAULT_CANCEL_URL");
+
+    if (!resolvedSuccessUrl) {
+      return c.json({ is_successful: false, message: "Missing required redirect URL: success_url" }, 400);
+    }
+    if (!resolvedFailedUrl) {
+      return c.json({ is_successful: false, message: "Missing required redirect URL: failed_url" }, 400);
+    }
+    if (!resolvedCancelUrl) {
+      return c.json({ is_successful: false, message: "Missing required redirect URL: cancel_url" }, 400);
+    }
+
     const { data: orderData, error: orderError } = await paymentSupabaseAdmin
       .from("orders")
       .insert({
@@ -151,6 +175,9 @@ export async function handleInitiatePayment(c: Context) {
         metadata: {
           ...metadata,
           tenant_id,
+          success_url: resolvedSuccessUrl,
+          failed_url: resolvedFailedUrl,
+          cancel_url: resolvedCancelUrl,
         },
       })
       .select("order_id")
@@ -170,7 +197,6 @@ export async function handleInitiatePayment(c: Context) {
           orderId,
           amount,
           currency,
-          webhookUrl: webhook_url,
           expiryMinutes,
         });
       } catch (error) {

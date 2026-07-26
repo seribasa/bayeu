@@ -66,7 +66,6 @@ async function createStripeCheckout({
   orderId,
   amount,
   currency,
-  webhookUrl,
   expiryMinutes = 1440,
 }: {
   orderId: string;
@@ -79,6 +78,7 @@ async function createStripeCheckout({
     const amountInCents = Math.round(amount * 100);
     const expiresAt = Math.floor(Date.now() / 1000) + Math.round(expiryMinutes * 60);
 
+    const bayeuPublicUrl = Deno.env.get("SUPABASE_PUBLIC_URL") || "https://bayeu.peltops.com/functions/v1/payments";
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       currency,
@@ -95,8 +95,8 @@ async function createStripeCheckout({
       metadata: {
         order_id: orderId,
       },
-      success_url: webhookUrl || "https://kuala-app.peltops.com/payment/success",
-      cancel_url: "https://kuala-app.peltops.com/payment/cancel",
+      success_url: `${bayeuPublicUrl}/redirect?order_id=${orderId}&event=success`,
+      cancel_url: `${bayeuPublicUrl}/redirect?order_id=${orderId}&event=cancel`,
       expires_at: expiresAt,
     });
 
