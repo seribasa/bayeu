@@ -1,4 +1,4 @@
-import { Context } from "jsr:@hono/hono";
+import { Context } from "hono";
 import { paymentSupabaseAdmin } from "../../_shared/paymentSupabase.ts";
 import { getAuthToken } from "../../_shared/jwtHelper.ts";
 import { createStripeIntent } from "../gateways/stripe.ts";
