@@ -197,7 +197,7 @@ export async function handleInitiatePayment(c: Context) {
         user_id: userId,
         total_amount: amount,
         currency: currency,
-        status: "none",
+        status: "draft",
         gateway: gateway,
         metadata: {
           ...metadata,
