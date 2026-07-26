@@ -7,7 +7,15 @@ import { createSnapMidtrans } from "../gateways/midtrans.ts";
 async function rollbackOrder(orderId: string, maxRetries = 3) {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      await paymentSupabaseAdmin.from("orders").delete().eq("order_id", orderId);
+      const { error } = await paymentSupabaseAdmin
+        .from("orders")
+        .delete()
+        .eq("order_id", orderId);
+
+      if (error) {
+        throw error;
+      }
+
       console.log(`Order ${orderId} successfully rolled back.`);
       return;
     } catch (error) {
