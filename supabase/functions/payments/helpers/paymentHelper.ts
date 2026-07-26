@@ -56,13 +56,19 @@ function mapStripeToEnum(event: string): TransactionStatusEnum {
       return TransactionStatusEnum.processing;
 
     case "payment_intent.succeeded":
+    case "checkout.session.completed":
+    case "checkout.session.async_payment_succeeded":
       return TransactionStatusEnum.success;
 
     case "payment_intent.payment_failed":
+    case "checkout.session.async_payment_failed":
       return TransactionStatusEnum.failed;
 
     case "payment_intent.canceled":
       return TransactionStatusEnum.cancelled;
+
+    case "checkout.session.expired":
+      return TransactionStatusEnum.expired;
 
     default:
       return TransactionStatusEnum.initiated;
