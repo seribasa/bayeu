@@ -95,6 +95,11 @@ async function createStripeCheckout({
       metadata: {
         order_id: orderId,
       },
+      payment_intent_data: {
+        metadata: {
+          order_id: orderId,
+        },
+      },
       success_url: `${bayeuPublicUrl}/redirect?order_id=${orderId}&event=success`,
       cancel_url: `${bayeuPublicUrl}/redirect?order_id=${orderId}&event=cancel`,
       expires_at: expiresAt,
