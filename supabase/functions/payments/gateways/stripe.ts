@@ -176,7 +176,7 @@ async function handleStripeWebhook(event: any) {
       return;
     }
 
-    const txStatus = mapStripeToEnum(event.type);
+    const txStatus = mapStripeToEnum(event.type, data.payment_status);
     const { paymentStatus, orderStatus } = mapTransactionToStatus(txStatus);
 
     const { data: order } = await paymentSupabaseAdmin
@@ -192,11 +192,13 @@ async function handleStripeWebhook(event: any) {
 
     const orderAmount = data.amount_total ? data.amount_total / 100 : (data.amount ? data.amount / 100 : order.total_amount);
 
+    const transactionId = typeof data.payment_intent === 'string' ? data.payment_intent : (data.payment_intent?.id || data.id);
+
     const { data: rpcResult, error: rpcError } = await paymentSupabaseAdmin.rpc("process_payment_webhook", {
       p_order_id: orderId,
       p_gateway_name: "stripe",
-      p_gateway_payment_id: data.id,
-      p_gateway_transaction_id: data.id,
+      p_gateway_payment_id: transactionId,
+      p_gateway_transaction_id: transactionId,
       p_amount: orderAmount,
       p_currency: (data.currency || "idr").toLowerCase(),
       p_payment_status: paymentStatus,

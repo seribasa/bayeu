@@ -95,6 +95,22 @@ Deno.test("mapStripeToEnum", async (t) => {
       mapStripeToEnum("payment_intent.succeeded"),
       TransactionStatusEnum.success,
     );
+    assertEquals(
+      mapStripeToEnum("checkout.session.completed"),
+      TransactionStatusEnum.success,
+    );
+    assertEquals(
+      mapStripeToEnum("checkout.session.completed", "paid"),
+      TransactionStatusEnum.success,
+    );
+    assertEquals(
+      mapStripeToEnum("checkout.session.completed", "unpaid"),
+      TransactionStatusEnum.pending,
+    );
+    assertEquals(
+      mapStripeToEnum("checkout.session.async_payment_succeeded"),
+      TransactionStatusEnum.success,
+    );
   });
   await t.step("should map payment_failed to failed", () => {
     assertEquals(
