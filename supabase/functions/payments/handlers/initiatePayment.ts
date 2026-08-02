@@ -105,24 +105,48 @@ export async function handleInitiatePayment(c: Context) {
       }
     }
 
-    // Check for existing pending order for this tenant and invoice
+    // Check for existing orders for this tenant and invoice
     if (metadata?.invoice_id) {
-      const { data: existingOrders, error: findError } = await paymentSupabaseAdmin
+      const { data: allExistingOrders, error: findError } = await paymentSupabaseAdmin
         .from("orders")
         .select("order_id, gateway, gateway_response, created_at, status, metadata")
         .eq("user_id", userId)
-        .eq("gateway", gateway)
         .eq("metadata->>invoice_id", String(metadata.invoice_id))
-        .eq("metadata->>tenant_id", String(tenant_id))
-        .not("status::text", "in", "(paid,cancelled,failed,refunded,expire)");
+        .eq("metadata->>tenant_id", String(tenant_id));
 
       if (findError) {
         console.error("Error searching existing orders:", findError);
       }
 
-      if (existingOrders && existingOrders.length > 0) {
-        // deno-lint-ignore no-explicit-any
-        const matchingOrder = existingOrders.find((o: any) =>
+      if (allExistingOrders && allExistingOrders.length > 0) {
+        type OrderRecord = {
+          order_id: string;
+          status: string;
+          gateway: string;
+          created_at: string;
+          gateway_response: Record<string, string>;
+        };
+
+        // Check if the invoice is already paid across any gateway
+        const paidOrder = allExistingOrders.find((o: OrderRecord) => o.status === "paid");
+        if (paidOrder) {
+          return c.json({
+            is_successful: false,
+            message: "This invoice has already been paid.",
+            data: {
+              order_id: paidOrder.order_id,
+              status: paidOrder.status
+            }
+          }, 400);
+        }
+
+        // Filter for pending orders matching the requested gateway
+        const pendingOrders = allExistingOrders.filter((o: OrderRecord) => 
+          !["paid", "cancelled", "failed", "refunded", "expire"].includes(o.status) &&
+          o.gateway === gateway
+        );
+
+        const matchingOrder = pendingOrders.find((o: OrderRecord) =>
           o.gateway_response &&
           o.gateway_response.token
         );
