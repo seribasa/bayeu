@@ -175,6 +175,7 @@ async function handleMidtransWebhook(data: any) {
       await publishPaymentEvent(metadata.tenant_id, {
         order_id: order_id,
         status: "success",
+        amount: amount,
         metadata: metadata,
       });
     }

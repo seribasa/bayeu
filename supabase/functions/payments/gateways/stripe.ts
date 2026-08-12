@@ -218,6 +218,7 @@ async function handleStripeWebhook(event: any) {
       await publishPaymentEvent(metadata.tenant_id, {
         order_id: orderId,
         status: "success",
+        amount: orderAmount,
         metadata: metadata,
       });
     }
