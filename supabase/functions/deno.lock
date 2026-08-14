@@ -21,6 +21,7 @@
     "npm:@supabase/functions-js@2.4.4": "2.4.4",
     "npm:@supabase/node-fetch@2.6.15": "2.6.15",
     "npm:@supabase/postgrest-js@1.19.4": "1.19.4",
+    "npm:@supabase/postgrest-js@1.21.4": "1.21.4",
     "npm:@supabase/realtime-js@2.11.2": "2.11.2",
     "npm:@supabase/storage-js@2.7.1": "2.7.1",
     "npm:@types/node@*": "22.12.0",
@@ -72,7 +73,7 @@
         "npm:@supabase/auth-js",
         "npm:@supabase/functions-js",
         "npm:@supabase/node-fetch",
-        "npm:@supabase/postgrest-js",
+        "npm:@supabase/postgrest-js@1.19.4",
         "npm:@supabase/realtime-js",
         "npm:@supabase/storage-js"
       ]
@@ -138,6 +139,12 @@
     },
     "@supabase/postgrest-js@1.19.4": {
       "integrity": "sha512-O4soKqKtZIW3olqmbXXbKugUtByD2jPa8kL2m2c1oozAO11uCcGrRhkZL0kVxjBLrXHE0mdSkFsMj7jDSfyNpw==",
+      "dependencies": [
+        "@supabase/node-fetch"
+      ]
+    },
+    "@supabase/postgrest-js@1.21.4": {
+      "integrity": "sha512-TxZCIjxk6/dP9abAi89VQbWWMBbybpGWyvmIzTd79OeravM13OjR/YEYeyUOPcM1C3QyvXkvPZhUfItvmhY1IQ==",
       "dependencies": [
         "@supabase/node-fetch"
       ]
@@ -824,7 +831,7 @@
       "jsr:@std/testing@^1.0.12",
       "jsr:@supabase/supabase-js@2",
       "npm:@hookdeck/outpost-sdk@^1.4.1",
-      "npm:@supabase/postgrest-js@1.19.4",
+      "npm:@supabase/postgrest-js@1.21.4",
       "npm:midtrans-client@1.4.2",
       "npm:stripe@18.0.0"
     ]
