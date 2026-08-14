@@ -4,6 +4,7 @@ import { handleInitiatePayment } from "./handlers/initiatePayment.ts";
 import { handleTransaction } from "./handlers/transaction.ts";
 import { handleOrderStatus } from "./handlers/order.ts";
 import { handleWebhook } from "./handlers/webhook.ts";
+import { handlePaymentRedirect } from "./handlers/redirect.ts";
 import { logger } from "hono/logger";
 
 import { cors } from "hono/cors";
@@ -27,6 +28,8 @@ app.use("/initiate-payment", cors({
 
 app.post("/initiate", handleInitiate);
 app.post("/initiate-payment", handleInitiatePayment);
+app.get("/redirect", handlePaymentRedirect);
+app.get("/payments/redirect", handlePaymentRedirect);
 app.get("/order/:order_id", handleOrderStatus);
 app.get("/transaction/:transaction_id", handleTransaction);
 app.post("/webhook/:payment_gateway", handleWebhook);

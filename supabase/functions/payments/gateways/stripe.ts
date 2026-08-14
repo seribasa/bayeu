@@ -3,6 +3,7 @@ import { paymentSupabaseAdmin } from "../../_shared/paymentSupabase.ts";
 import {
   mapStripeToEnum,
   mapTransactionToStatus,
+  TransactionStatusEnum,
 } from "../helpers/paymentHelper.ts";
 import { publishPaymentEvent } from "../helpers/outpost.ts";
 import { CreatePaymentResponse } from "../../_shared/types/createPaymentResponse.ts";
@@ -61,6 +62,63 @@ async function createStripeIntent({
   }
 }
 
+async function createStripeCheckout({
+  orderId,
+  amount,
+  currency,
+  expiryMinutes = 1440,
+}: {
+  orderId: string;
+  amount: number;
+  currency: string;
+  webhookUrl?: string;
+  expiryMinutes?: number;
+}): Promise<CreatePaymentResponse> {
+  try {
+    const amountInCents = Math.round(amount * 100);
+    const expiresAt = Math.floor(Date.now() / 1000) + Math.round(expiryMinutes * 60);
+
+    const bayeuPublicUrl = Deno.env.get("SUPABASE_PUBLIC_URL") || "https://bayeu.peltops.com/functions/v1/payments";
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      currency,
+      line_items: [
+        {
+          price_data: {
+            currency,
+            product_data: { name: `Invoice Order ${orderId}` },
+            unit_amount: amountInCents,
+          },
+          quantity: 1,
+        },
+      ],
+      metadata: {
+        order_id: orderId,
+      },
+      payment_intent_data: {
+        metadata: {
+          order_id: orderId,
+        },
+      },
+      success_url: `${bayeuPublicUrl}/redirect?order_id=${orderId}&event=success`,
+      cancel_url: `${bayeuPublicUrl}/redirect?order_id=${orderId}&event=cancel`,
+      expires_at: expiresAt,
+    });
+
+    const response: CreatePaymentResponse = {
+      order_id: orderId,
+      gateway: "stripe",
+      redirect_url: session.url || undefined,
+      token: session.id,
+    };
+
+    return response;
+  } catch (error) {
+    console.error("Error creating Stripe checkout session:", error);
+    throw error;
+  }
+}
+
 // deno-lint-ignore no-explicit-any
 async function verifyStripeSignature(sig: string, body: any) {
   try {
@@ -113,80 +171,56 @@ async function handleStripeWebhook(event: any) {
     const data = event.data.object;
     const orderId = data.metadata?.order_id;
 
-    const txStatus = mapStripeToEnum(event.type);
-    const { paymentStatus } = mapTransactionToStatus(txStatus);
-
-    const { data: gateway } = await paymentSupabaseAdmin
-      .from("payment_gateway")
-      .select("gateway_id")
-      .eq("name", "stripe")
-      .single();
-
-    if (!gateway) {
-      throw new Error("Payment gateway not found");
-    }
-
-    if (event.type === "payment_intent.created") {
-      const { data: order, error: errorOrder } = await paymentSupabaseAdmin
-        .from("orders")
-        .select("total_amount")
-        .eq("order_id", orderId)
-        .single();
-
-      if (errorOrder) {
-        console.error(errorOrder);
-        throw new Error("Order not found");
-      }
-
-      const { data: payment } = await paymentSupabaseAdmin
-        .from("payments")
-        .insert({
-          gateway_payment_id: data.id,
-          order_id: orderId,
-          gateway_id: gateway.gateway_id,
-          amount: order.total_amount,
-          currency: data.currency.toLowerCase(),
-          status: paymentStatus,
-        })
-        .select("payment_id")
-        .single();
-
-      if (!payment) {
-        throw new Error("Failed to create payment");
-      }
-
-      await paymentSupabaseAdmin.from("transactions").insert({
-        payment_id: payment.payment_id,
-        gateway_transaction_id: data.id,
-        gateway_response: data,
-        status: txStatus,
-      });
+    if (!orderId) {
+      console.log("Stripe webhook missing metadata.order_id, skipping:", event.type);
       return;
     }
 
-    await paymentSupabaseAdmin
-      .from("transactions")
-      .update({
-        status: txStatus,
-        gateway_response: data,
-        updated_at: new Date(),
-      })
-      .eq("gateway_transaction_id", data.id);
+    const txStatus = mapStripeToEnum(event.type, data.payment_status);
+    const { paymentStatus, orderStatus } = mapTransactionToStatus(txStatus);
 
-    if (event.type === "payment_intent.succeeded") {
-      const { data: order } = await paymentSupabaseAdmin
-        .from("orders")
-        .select("metadata")
-        .eq("order_id", orderId)
-        .single();
+    const { data: order } = await paymentSupabaseAdmin
+      .from("orders")
+      .select("total_amount, metadata")
+      .eq("order_id", orderId)
+      .single();
 
-      if (order?.metadata?.tenant_id) {
-        await publishPaymentEvent(order.metadata.tenant_id, {
-          order_id: orderId,
-          status: "success",
-          metadata: order.metadata,
-        });
-      }
+    if (!order) {
+      console.error(`Order ${orderId} not found for Stripe webhook`);
+      return;
+    }
+
+    const orderAmount = data.amount_total ? data.amount_total / 100 : (data.amount ? data.amount / 100 : order.total_amount);
+
+    const transactionId = typeof data.payment_intent === 'string' ? data.payment_intent : (data.payment_intent?.id || data.id);
+
+    const { data: rpcResult, error: rpcError } = await paymentSupabaseAdmin.rpc("process_payment_webhook", {
+      p_order_id: orderId,
+      p_gateway_name: "stripe",
+      p_gateway_payment_id: transactionId,
+      p_gateway_transaction_id: transactionId,
+      p_amount: orderAmount,
+      p_currency: (data.currency || "idr").toLowerCase(),
+      p_payment_status: paymentStatus,
+      p_transaction_status: txStatus,
+      p_order_status: orderStatus,
+      p_gateway_response: data,
+    });
+
+    if (rpcError) {
+      console.error("RPC Error processing Stripe webhook:", rpcError);
+      throw rpcError;
+    }
+
+    const metadata = rpcResult?.metadata || order.metadata;
+
+    if (txStatus === TransactionStatusEnum.success && metadata?.tenant_id && !rpcResult?.already_paid) {
+      await publishPaymentEvent(metadata.tenant_id, {
+        order_id: orderId,
+        status: "success",
+        amount: orderAmount,
+        metadata: metadata,
+      });
     }
   } catch (error) {
     console.error("Error handling Stripe webhook:", error);
@@ -194,4 +228,10 @@ async function handleStripeWebhook(event: any) {
   }
 }
 
-export { stripe, createStripeIntent, verifyStripeSignature, handleStripeWebhook };
+export {
+  createStripeCheckout,
+  createStripeIntent,
+  handleStripeWebhook,
+  stripe,
+  verifyStripeSignature,
+};

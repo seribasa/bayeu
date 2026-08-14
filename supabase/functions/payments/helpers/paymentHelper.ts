@@ -42,7 +42,7 @@ function mapMidtransToEnum(status: string): TransactionStatusEnum {
   }
 }
 
-function mapStripeToEnum(event: string): TransactionStatusEnum {
+function mapStripeToEnum(event: string, paymentStatus?: string): TransactionStatusEnum {
   switch (event) {
     case "payment_intent.created":
       return TransactionStatusEnum.initiated;
@@ -55,14 +55,25 @@ function mapStripeToEnum(event: string): TransactionStatusEnum {
     case "payment_intent.processing":
       return TransactionStatusEnum.processing;
 
+    case "checkout.session.completed":
+      if (paymentStatus === "unpaid") {
+        return TransactionStatusEnum.pending;
+      }
+      return TransactionStatusEnum.success;
+
     case "payment_intent.succeeded":
+    case "checkout.session.async_payment_succeeded":
       return TransactionStatusEnum.success;
 
     case "payment_intent.payment_failed":
+    case "checkout.session.async_payment_failed":
       return TransactionStatusEnum.failed;
 
     case "payment_intent.canceled":
       return TransactionStatusEnum.cancelled;
+
+    case "checkout.session.expired":
+      return TransactionStatusEnum.expired;
 
     default:
       return TransactionStatusEnum.initiated;
