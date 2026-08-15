@@ -62,7 +62,7 @@ async function createSnapMidtrans({
   const parameter: any = {
     transaction_details: {
       order_id: orderId,
-      gross_amount: totalAmount,
+      gross_amount: Math.round(totalAmount),
     },
     customer_details: {
       first_name: customerName,
