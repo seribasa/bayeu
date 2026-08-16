@@ -67,7 +67,7 @@ async function createSnapMidtrans({
     customer_details: {
       first_name: customerName,
       last_name: "",
-      email: customerEmail,
+      email: customerEmail && customerEmail.includes("@") ? customerEmail : undefined,
     },
     credit_card: {
       secure: true,
