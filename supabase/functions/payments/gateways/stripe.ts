@@ -1,3 +1,4 @@
+import { Context } from "hono";
 import Stripe from "stripe";
 import { paymentSupabaseAdmin } from "../../_shared/paymentSupabase.ts";
 import {
@@ -7,16 +8,16 @@ import {
 } from "../helpers/paymentHelper.ts";
 import { publishPaymentEvent } from "../helpers/outpost.ts";
 import { CreatePaymentResponse } from "../../_shared/types/createPaymentResponse.ts";
+import { IPaymentGateway, PaymentParams } from "./types.ts";
 
 const STRIPE_ENVIRONMENT = Deno.env.get("STRIPE_ENVIRONMENT");
 const STRIPE_SANDBOX_SECRET_KEY = Deno.env.get("STRIPE_SANDBOX_SECRET_KEY");
 const STRIPE_PRODUCTION_SECRET_KEY = Deno.env.get(
-  "STRIPE_PRODUCTION_SECRET_KEY"
+  "STRIPE_PRODUCTION_SECRET_KEY",
 );
-const STRIPE_SECRET_KEY =
-  STRIPE_ENVIRONMENT === "production"
-    ? STRIPE_PRODUCTION_SECRET_KEY
-    : STRIPE_SANDBOX_SECRET_KEY;
+const STRIPE_SECRET_KEY = STRIPE_ENVIRONMENT === "production"
+  ? STRIPE_PRODUCTION_SECRET_KEY
+  : STRIPE_SANDBOX_SECRET_KEY;
 
 if (!STRIPE_SECRET_KEY) {
   throw new Error("STRIPE_SECRET_KEY is not defined");
@@ -76,9 +77,11 @@ async function createStripeCheckout({
 }): Promise<CreatePaymentResponse> {
   try {
     const amountInCents = Math.round(amount * 100);
-    const expiresAt = Math.floor(Date.now() / 1000) + Math.round(expiryMinutes * 60);
+    const expiresAt = Math.floor(Date.now() / 1000) +
+      Math.round(expiryMinutes * 60);
 
-    const bayeuPublicUrl = Deno.env.get("SUPABASE_PUBLIC_URL") || "https://bayeu.peltops.com/functions/v1/payments";
+    const bayeuPublicUrl = Deno.env.get("SUPABASE_PUBLIC_URL") ||
+      "https://bayeu.peltops.com/functions/v1/payments";
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       currency,
@@ -100,7 +103,8 @@ async function createStripeCheckout({
           order_id: orderId,
         },
       },
-      success_url: `${bayeuPublicUrl}/redirect?order_id=${orderId}&event=success`,
+      success_url:
+        `${bayeuPublicUrl}/redirect?order_id=${orderId}&event=success`,
       cancel_url: `${bayeuPublicUrl}/redirect?order_id=${orderId}&event=cancel`,
       expires_at: expiresAt,
     });
@@ -125,7 +129,7 @@ async function verifyStripeSignature(sig: string, body: any) {
     const event = await stripe.webhooks.constructEventAsync(
       body,
       sig,
-      STRIPE_WEBHOOK_SECRET_KEY || ""
+      STRIPE_WEBHOOK_SECRET_KEY || "",
     );
     return { valid: true, event };
   } catch (err) {
@@ -172,7 +176,10 @@ async function handleStripeWebhook(event: any) {
     const orderId = data.metadata?.order_id;
 
     if (!orderId) {
-      console.log("Stripe webhook missing metadata.order_id, skipping:", event.type);
+      console.log(
+        "Stripe webhook missing metadata.order_id, skipping:",
+        event.type,
+      );
       return;
     }
 
@@ -190,22 +197,29 @@ async function handleStripeWebhook(event: any) {
       return;
     }
 
-    const orderAmount = data.amount_total ? data.amount_total / 100 : (data.amount ? data.amount / 100 : order.total_amount);
+    const orderAmount = data.amount_total
+      ? data.amount_total / 100
+      : (data.amount ? data.amount / 100 : order.total_amount);
 
-    const transactionId = typeof data.payment_intent === 'string' ? data.payment_intent : (data.payment_intent?.id || data.id);
+    const transactionId = typeof data.payment_intent === "string"
+      ? data.payment_intent
+      : (data.payment_intent?.id || data.id);
 
-    const { data: rpcResult, error: rpcError } = await paymentSupabaseAdmin.rpc("process_payment_webhook", {
-      p_order_id: orderId,
-      p_gateway_name: "stripe",
-      p_gateway_payment_id: transactionId,
-      p_gateway_transaction_id: transactionId,
-      p_amount: orderAmount,
-      p_currency: (data.currency || "idr").toLowerCase(),
-      p_payment_status: paymentStatus,
-      p_transaction_status: txStatus,
-      p_order_status: orderStatus,
-      p_gateway_response: data,
-    });
+    const { data: rpcResult, error: rpcError } = await paymentSupabaseAdmin.rpc(
+      "process_payment_webhook",
+      {
+        p_order_id: orderId,
+        p_gateway_name: "stripe",
+        p_gateway_payment_id: transactionId,
+        p_gateway_transaction_id: transactionId,
+        p_amount: orderAmount,
+        p_currency: (data.currency || "idr").toLowerCase(),
+        p_payment_status: paymentStatus,
+        p_transaction_status: txStatus,
+        p_order_status: orderStatus,
+        p_gateway_response: data,
+      },
+    );
 
     if (rpcError) {
       console.error("RPC Error processing Stripe webhook:", rpcError);
@@ -214,7 +228,10 @@ async function handleStripeWebhook(event: any) {
 
     const metadata = rpcResult?.metadata || order.metadata;
 
-    if (txStatus === TransactionStatusEnum.success && metadata?.tenant_id && !rpcResult?.already_paid) {
+    if (
+      txStatus === TransactionStatusEnum.success && metadata?.tenant_id &&
+      !rpcResult?.already_paid
+    ) {
       await publishPaymentEvent(metadata.tenant_id, {
         order_id: orderId,
         status: "success",
@@ -228,10 +245,43 @@ async function handleStripeWebhook(event: any) {
   }
 }
 
-export {
-  createStripeCheckout,
-  createStripeIntent,
-  handleStripeWebhook,
-  stripe,
-  verifyStripeSignature,
-};
+export class StripeGateway implements IPaymentGateway {
+  async createTransaction(params: PaymentParams) {
+    return await createStripeCheckout({
+      orderId: params.orderId,
+      amount: params.amount,
+      currency: params.currency,
+      expiryMinutes: params.expiryMinutes,
+    });
+  }
+
+  async handleWebhook(c: Context): Promise<Response> {
+    const stripeSignature = c.req.header("stripe-signature");
+    if (!stripeSignature) {
+      return c.json({
+        is_successful: false,
+        message: "Missing Stripe signature",
+      }, 403);
+    }
+
+    const rawBody = await c.req.text();
+    const stripeResult = await verifyStripeSignature(stripeSignature, rawBody);
+
+    if (!stripeResult.valid) {
+      console.error("Invalid Stripe signature");
+      return c.json({
+        is_successful: false,
+        message: "Invalid Stripe signature",
+      }, 403);
+    }
+
+    await handleStripeWebhook(stripeResult.event);
+    console.log("Stripe webhook processed:", stripeResult.event);
+    return c.json(
+      { is_successful: true, message: "Stripe webhook processed" },
+      200,
+    );
+  }
+}
+
+export { createStripeIntent, stripe };

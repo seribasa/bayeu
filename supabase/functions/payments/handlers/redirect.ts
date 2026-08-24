@@ -30,7 +30,7 @@ export async function handlePaymentRedirect(c: Context) {
       event: `redirect.${event}`,
       payload: metadata,
     });
-    
+
     if (event === "cancel") {
       targetUrl = metadata.cancel_url || metadata.back_url;
     } else if (event === "failed" || event === "error") {
@@ -45,12 +45,18 @@ export async function handlePaymentRedirect(c: Context) {
     }
 
     const safeTargetUrl = targetUrl || "/";
-    if (!safeTargetUrl.startsWith("http://") && !safeTargetUrl.startsWith("https://") && !safeTargetUrl.startsWith("/")) {
+    if (
+      !safeTargetUrl.startsWith("http://") &&
+      !safeTargetUrl.startsWith("https://") && !safeTargetUrl.startsWith("/")
+    ) {
       return c.text("Invalid redirect URL scheme", 400);
     }
     let finalUrl: string;
     try {
       const parsedUrl = new URL(safeTargetUrl);
+      if (!parsedUrl.searchParams.has("invoice_id") && metadata.invoice_id) {
+        parsedUrl.searchParams.set("invoice_id", metadata.invoice_id);
+      }
       if (!parsedUrl.searchParams.has("order_id")) {
         parsedUrl.searchParams.set("order_id", orderId);
       }
@@ -60,9 +66,13 @@ export async function handlePaymentRedirect(c: Context) {
       finalUrl = parsedUrl.toString();
     } catch (_e) {
       const delimiter = safeTargetUrl.includes("?") ? "&" : "?";
-      finalUrl = `${safeTargetUrl}${delimiter}order_id=${
-        encodeURIComponent(orderId)
-      }&status=${encodeURIComponent(event)}`;
+      finalUrl = `${safeTargetUrl}${delimiter}`;
+      if (metadata.invoice_id) {
+        finalUrl += `invoice_id=${encodeURIComponent(metadata.invoice_id)}&`;
+      }
+      finalUrl += `order_id=${encodeURIComponent(orderId)}&status=${
+        encodeURIComponent(event)
+      }`;
     }
 
     return c.redirect(finalUrl, 302);

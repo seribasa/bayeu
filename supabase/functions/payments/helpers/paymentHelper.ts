@@ -42,7 +42,10 @@ function mapMidtransToEnum(status: string): TransactionStatusEnum {
   }
 }
 
-function mapStripeToEnum(event: string, paymentStatus?: string): TransactionStatusEnum {
+function mapStripeToEnum(
+  event: string,
+  paymentStatus?: string,
+): TransactionStatusEnum {
   switch (event) {
     case "payment_intent.created":
       return TransactionStatusEnum.initiated;
@@ -102,8 +105,8 @@ function mapTransactionToStatus(txStatus: string): {
 }
 
 export {
-  TransactionStatusEnum,
   mapMidtransToEnum,
   mapStripeToEnum,
   mapTransactionToStatus,
+  TransactionStatusEnum,
 };

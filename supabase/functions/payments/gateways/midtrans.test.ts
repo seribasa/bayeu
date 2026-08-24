@@ -1,16 +1,15 @@
-// deno-lint-ignore-file no-explicit-any
-import {
-  createSnapMidtrans,
-  handleMidtransWebhook,
-  snap,
-  verifyMidtransSignature,
-} from "./midtrans.ts";
+import { Context } from "hono";
+import * as mod from "node:crypto";
+import { MidtransGateway, snap } from "./midtrans.ts";
 import { assertEquals } from "@std/assert";
 import { stub } from "@std/testing/mock";
 import { paymentSupabaseAdmin } from "../../_shared/paymentSupabase.ts";
 
-Deno.test("Midtrans Snap Configuration", () => {
-  Deno.env.set("MIDTRANS_ENVIRONMENT", "production");
+Deno.test({
+  sanitizeOps: false,
+  sanitizeResources: false,
+  name: "Midtrans Snap Configuration",
+}, () => {
   const localSnap = snap;
 
   assertEquals(
@@ -23,7 +22,11 @@ Deno.test("Midtrans Snap Configuration", () => {
   );
 });
 
-Deno.test("createSnapMidtrans - creates transaction successfully", async () => {
+Deno.test({
+  sanitizeOps: false,
+  sanitizeResources: false,
+  name: "MidtransGateway - createTransaction creates transaction successfully",
+}, async () => {
   const mockTransactionResponse: {
     token: string;
     redirect_url: string;
@@ -39,14 +42,17 @@ Deno.test("createSnapMidtrans - creates transaction successfully", async () => {
   );
 
   try {
-    const result = await createSnapMidtrans({
+    const gateway = new MidtransGateway();
+    const result = await gateway.createTransaction({
       orderId: "test-order",
-      totalAmount: 100,
+      amount: 100,
+      currency: "IDR",
       customerName: "Test Customer",
       customerEmail: "customerEmail",
+      expiryMinutes: 1440,
     });
 
-    assertEquals(result, {
+    assertEquals(result as never as Record<string, unknown>, {
       order_id: "test-order",
       gateway: "midtrans",
       redirect_url: mockTransactionResponse.redirect_url,
@@ -57,7 +63,11 @@ Deno.test("createSnapMidtrans - creates transaction successfully", async () => {
   }
 });
 
-Deno.test("createSnapMidtrans - creates transaction throws error", async () => {
+Deno.test({
+  sanitizeOps: false,
+  sanitizeResources: false,
+  name: "MidtransGateway - createTransaction throws error",
+}, async () => {
   const snapError = new Error("Snap transaction error");
 
   const midtransStub = stub(
@@ -67,13 +77,16 @@ Deno.test("createSnapMidtrans - creates transaction throws error", async () => {
   );
 
   try {
-    await createSnapMidtrans({
+    const gateway = new MidtransGateway();
+    await gateway.createTransaction({
       orderId: "test-order",
-      totalAmount: 100,
+      amount: 100,
+      currency: "IDR",
       customerName: "Test Customer",
       customerEmail: "customerEmail",
+      expiryMinutes: 1440,
     });
-    throw new Error("Expected createSnapMidtrans to throw");
+    throw new Error("Expected createTransaction to throw");
   } catch (err: unknown) {
     const error = err as Error;
     assertEquals(error.message, snapError.message);
@@ -82,263 +95,310 @@ Deno.test("createSnapMidtrans - creates transaction throws error", async () => {
   }
 });
 
-Deno.test("verifyMidtransSignature", () => {
-  const signature =
-    "e78e2223638cb60dbdbc88d23deb9b927ac41be7263ab38758605bac834dc25425705543707504bfef0802914cfa3f5f538fa308d1f9086211c420e7892ba2ba";
+Deno.test({
+  sanitizeOps: false,
+  sanitizeResources: false,
+  name: "MidtransGateway - handleWebhook handles valid webhook",
+}, async () => {
+  const mockResponse = {
+    transaction_status: "pending",
+    transaction_id: "test-transaction-id",
+    order_id: "Postman-1578568851",
+    currency: "IDR",
+    status_code: "200",
+    gross_amount: "10000.00",
+    signature_key:
+      "e78e2223638cb60dbdbc88d23deb9b927ac41be7263ab38758605bac834dc25425705543707504bfef0802914cfa3f5f538fa308d1f9086211c420e7892ba2ba",
+    server_key: "VT-server-HJMpl9HLr_ntOKt5mRONdmKj",
+  };
 
   Deno.env.set("SERVER_KEY", "VT-server-HJMpl9HLr_ntOKt5mRONdmKj");
 
-  const body = {
-    order_id: "Postman-1578568851",
+  const orderQuery = {
+    select: () => ({
+      eq: () => ({
+        single: () =>
+          Promise.resolve({
+            data: {
+              order_id: "Postman-1578568851",
+              user_id: "test-user-id",
+              total_amount: 10000,
+            },
+            error: null,
+          }),
+      }),
+    }),
+  };
+
+  const fromStub = stub(
+    paymentSupabaseAdmin,
+    "from",
+    ((table: string) => {
+      if (table === "orders") return orderQuery;
+      return {} as never;
+    }) as never,
+  );
+
+  const rpcStub = stub(
+    paymentSupabaseAdmin,
+    "rpc",
+    () => Promise.resolve({ data: {}, error: null }) as never,
+  );
+
+  const mockContext = {
+    req: {
+      json: () => Promise.resolve(mockResponse),
+    },
+    json: (body: unknown, status: number) =>
+      new Response(JSON.stringify(body), { status }),
+  } as never as Context;
+
+  try {
+    const gateway = new MidtransGateway();
+    const result = await gateway.handleWebhook(mockContext);
+
+    assertEquals(result.status, 200);
+    assertEquals(await result.json(), {
+      is_successful: true,
+      message: "Midtrans webhook processed",
+    });
+  } finally {
+    fromStub.restore();
+    rpcStub.restore();
+  }
+});
+
+Deno.test({
+  sanitizeOps: false,
+  sanitizeResources: false,
+  name: "MidtransGateway - handleWebhook invalid signature throws 403",
+}, async () => {
+  const mockResponse = {
+    transaction_status: "pending",
+    transaction_id: "test-transaction-id",
+    order_id: "test-order-id",
+    currency: "IDR",
     status_code: "200",
     gross_amount: "10000.00",
-    server_key: Deno.env.get("SERVER_KEY") || "",
+    signature_key: "invalid_sig",
   };
 
-  // Mock the verifyMidtransSignature function
-  const result = verifyMidtransSignature({
-    signature,
-    body,
+  const mockContext = {
+    req: {
+      json: () => Promise.resolve(mockResponse),
+    },
+    json: (body: unknown, status: number) =>
+      new Response(JSON.stringify(body), { status }),
+  } as never as Context;
+
+  const gateway = new MidtransGateway();
+  const result = await gateway.handleWebhook(mockContext);
+
+  assertEquals(result.status, 403);
+  assertEquals(await result.json(), {
+    is_successful: false,
+    message: "Invalid Midtrans signature",
   });
-
-  // Check if the result is as expected
-  assertEquals(result, true);
 });
 
-Deno.test("handleMidtransWebhook - should handle valid webhook with transaction status equal to 'pending'", async () => {
+Deno.test({
+  sanitizeOps: false,
+  sanitizeResources: false,
+  name: "MidtransGateway - handleWebhook missing signature",
+}, async () => {
   const mockResponse = {
     transaction_status: "pending",
-    transaction_id: "test-transaction-id",
-    order_id: "test-order-id",
-    currency: "IDR",
   };
-  const gatewayQuery: any = {
-    select: () => ({
-      eq: () => ({
-        single: () =>
-          Promise.resolve({
-            data: {
-              gateway_id: "midtrans",
-            },
-            error: null,
-          }),
-      }),
-    }),
+
+  const mockContext = {
+    req: {
+      json: () => Promise.resolve(mockResponse),
+    },
+    json: (body: unknown, status: number) =>
+      new Response(JSON.stringify(body), { status }),
+  } as never as Context;
+
+  const gateway = new MidtransGateway();
+  const result = await gateway.handleWebhook(mockContext);
+
+  assertEquals(result.status, 403);
+  assertEquals(await result.json(), {
+    is_successful: false,
+    message: "Missing Midtrans signature",
+  });
+});
+
+function genSig(
+  order_id: unknown,
+  status: unknown,
+  amount: unknown,
+  serverKey: string,
+) {
+  const sha512 = mod.createHash("sha512");
+  sha512.update(
+    (order_id as string) + (status as string) + (amount as string) + serverKey,
+  );
+  return sha512.digest("hex");
+}
+
+Deno.test({
+  sanitizeOps: false,
+  sanitizeResources: false,
+  name: "MidtransGateway - handleWebhook missing order_id",
+}, async () => {
+  const mockResponse = {
+    transaction_status: "pending",
+    signature_key: genSig(
+      undefined as never,
+      undefined as never,
+      undefined as never,
+      "any_key",
+    ),
+    server_key: "any_key",
   };
-  const orderQuery: any = {
-    select: () => ({
-      eq: () => ({
-        single: () =>
-          Promise.resolve({
-            data: {
-              order_id: "test-order-id",
-              user_id: "test-user-id",
-              total_amount: 10000,
-            },
-            error: null,
-          }),
-      }),
-    }),
+
+  const mockContext = {
+    req: { json: () => Promise.resolve(mockResponse) },
+    json: (body: unknown, status: number) =>
+      new Response(JSON.stringify(body), { status }),
+  } as never as Context;
+
+  const gateway = new MidtransGateway();
+  const result = await gateway.handleWebhook(mockContext);
+  assertEquals(result.status, 200);
+});
+
+Deno.test({
+  sanitizeOps: false,
+  sanitizeResources: false,
+  name: "MidtransGateway - handleWebhook order not found",
+}, async () => {
+  const mockResponse = {
+    order_id: "missing-order",
+    transaction_status: "pending",
+    status_code: "200",
+    gross_amount: "100.00",
+    signature_key: genSig("missing-order", "200", "100.00", "any_key"),
+    server_key: "any_key",
   };
-  const paymentQuery: any = {
-    insert: () => ({
+
+  const fromStub = stub(paymentSupabaseAdmin, "from", () =>
+    ({
       select: () => ({
-        single: () =>
-          Promise.resolve({
-            data: {
-              payment_id: "test-payment-id",
-              order_id: "test-order-id",
-              gateway_payment_id: "test-transaction-id",
-              gateway_id: "midtrans",
-              amount: 10000,
-              currency: "IDR",
-              status: "pending",
-            },
-            error: null,
-          }),
+        eq: () => ({ single: () => Promise.resolve({ data: null }) }),
       }),
-    }),
+    }) as never);
+
+  const mockContext = {
+    req: { json: () => Promise.resolve(mockResponse) },
+    json: (body: unknown, status: number) =>
+      new Response(JSON.stringify(body), { status }),
+  } as never as Context;
+
+  try {
+    const gateway = new MidtransGateway();
+    const result = await gateway.handleWebhook(mockContext);
+    assertEquals(result.status, 200);
+  } finally {
+    fromStub.restore();
+  }
+});
+
+Deno.test({
+  sanitizeOps: false,
+  sanitizeResources: false,
+  name: "MidtransGateway - handleWebhook RPC Error",
+}, async () => {
+  const mockResponse = {
+    order_id: "valid-order",
+    transaction_status: "pending",
+    status_code: "200",
+    gross_amount: "100.00",
+    signature_key: genSig("valid-order", "200", "100.00", "any_key"),
+    server_key: "any_key",
   };
-  const transactionsQuery: any = {
-    insert: () =>
+
+  const fromStub = stub(paymentSupabaseAdmin, "from", () =>
+    ({
+      select: () => ({
+        eq: () => ({
+          single: () => Promise.resolve({ data: { total_amount: 100 } }),
+        }),
+      }),
+    }) as never);
+
+  const rpcStub = stub(
+    paymentSupabaseAdmin,
+    "rpc",
+    () =>
+      Promise.resolve({ data: null, error: { message: "RPC Error" } }) as never,
+  );
+
+  const mockContext = {
+    req: { json: () => Promise.resolve(mockResponse) },
+    json: (body: unknown, status: number) =>
+      new Response(JSON.stringify(body), { status }),
+  } as never as Context;
+
+  try {
+    const gateway = new MidtransGateway();
+    await gateway.handleWebhook(mockContext);
+  } catch (e: unknown) {
+    if (e instanceof Error) assertEquals(e.message, "RPC Error");
+  } finally {
+    fromStub.restore();
+    rpcStub.restore();
+  }
+});
+
+Deno.test({
+  sanitizeOps: false,
+  sanitizeResources: false,
+  name: "MidtransGateway - handleWebhook success and publish event",
+}, async () => {
+  const mockResponse = {
+    order_id: "valid-order",
+    transaction_status: "settlement",
+    status_code: "200",
+    gross_amount: "100.00",
+    signature_key: genSig("valid-order", "200", "100.00", "any_key"),
+    server_key: "any_key",
+  };
+
+  const fromStub = stub(paymentSupabaseAdmin, "from", () =>
+    ({
+      select: () => ({
+        eq: () => ({
+          single: () =>
+            Promise.resolve({
+              data: { total_amount: 100, metadata: { tenant_id: "tenant-1" } },
+            }),
+        }),
+      }),
+    }) as never);
+
+  const rpcStub = stub(
+    paymentSupabaseAdmin,
+    "rpc",
+    () =>
       Promise.resolve({
-        data: {},
+        data: { already_paid: false, metadata: { tenant_id: "tenant-1" } },
         error: null,
-      }),
-  };
-  const fromStub = stub(
-    paymentSupabaseAdmin,
-    "from",
-    (table: string) => {
-      if (table === "payment_gateway") return gatewayQuery;
-      if (table === "transactions") return transactionsQuery;
-      if (table === "orders") return orderQuery;
-      if (table === "payments") return paymentQuery;
-      return {} as any;
-    },
+      }) as never,
   );
 
-  try {
-    const response = await handleMidtransWebhook(mockResponse);
-    // response should be an void function
-    assertEquals(response, undefined);
-  } finally {
-    fromStub.restore();
-  }
-});
-
-Deno.test("handleMidtransWebhook - should throw error when payment gateway not found", async () => {
-  const mockResponse = {
-    transaction_status: "pending",
-    transaction_id: "test-transaction-id",
-    order_id: "test-order-id",
-    currency: "IDR",
-  };
-  const gatewayQuery: any = {
-    select: () => ({
-      eq: () => ({
-        single: () =>
-          Promise.resolve({
-            data: null,
-            error: { message: "Payment gateway not found" },
-          }),
-      }),
-    }),
-  };
-  const fromStub = stub(
-    paymentSupabaseAdmin,
-    "from",
-    (table: string) => {
-      if (table === "payment_gateway") return gatewayQuery;
-      return {} as any;
-    },
-  );
+  const mockContext = {
+    req: { json: () => Promise.resolve(mockResponse) },
+    json: (body: unknown, status: number) =>
+      new Response(JSON.stringify(body), { status }),
+  } as never as Context;
 
   try {
-    await handleMidtransWebhook(mockResponse);
-    throw new Error("Expected handleMidtransWebhook to throw");
-  } catch (err: unknown) {
-    const error = err as Error;
-    assertEquals(error.message, "Payment gateway not found");
+    const gateway = new MidtransGateway();
+    const result = await gateway.handleWebhook(mockContext);
+    assertEquals(result.status, 200);
   } finally {
     fromStub.restore();
-  }
-});
-
-Deno.test("handleMidtransWebhook - should throw error when order error occurs", async () => {
-  const mockResponse = {
-    transaction_status: "pending",
-    transaction_id: "test-transaction-id",
-    order_id: "test-order-id",
-    currency: "IDR",
-  };
-  const gatewayQuery: any = {
-    select: () => ({
-      eq: () => ({
-        single: () =>
-          Promise.resolve({
-            data: {
-              gateway_id: "midtrans",
-            },
-            error: null,
-          }),
-      }),
-    }),
-  };
-  const orderQuery: any = {
-    select: () => ({
-      eq: () => ({
-        single: () =>
-          Promise.resolve({
-            data: null,
-            error: { message: "Order not found" },
-          }),
-      }),
-    }),
-  };
-  const fromStub = stub(
-    paymentSupabaseAdmin,
-    "from",
-    (table: string) => {
-      if (table === "payment_gateway") return gatewayQuery;
-      if (table === "orders") return orderQuery;
-      return {} as any;
-    },
-  );
-
-  try {
-    await handleMidtransWebhook(mockResponse);
-  } catch (err: unknown) {
-    const error = err as Error;
-    assertEquals(error.message, "Order not found");
-  } finally {
-    fromStub.restore();
-  }
-});
-
-Deno.test("handleMidtransWebhook - should throw error when payment creation fails", async () => {
-  const mockResponse = {
-    transaction_status: "pending",
-    transaction_id: "test-transaction-id",
-    order_id: "test-order-id",
-    currency: "IDR",
-  };
-  const gatewayQuery: any = {
-    select: () => ({
-      eq: () => ({
-        single: () =>
-          Promise.resolve({
-            data: {
-              gateway_id: "midtrans",
-            },
-            error: null,
-          }),
-      }),
-    }),
-  };
-  const orderQuery: any = {
-    select: () => ({
-      eq: () => ({
-        single: () =>
-          Promise.resolve({
-            data: {
-              order_id: "test-order-id",
-              user_id: "test-user-id",
-              total_amount: 10000,
-            },
-            error: null,
-          }),
-      }),
-    }),
-  };
-  const paymentQuery: any = {
-    insert: () => ({
-      select: () => ({
-        single: () =>
-          Promise.resolve({
-            data: null,
-            error: { message: "Failed to create payment" },
-          }),
-      }),
-    }),
-  };
-  const fromStub = stub(
-    paymentSupabaseAdmin,
-    "from",
-    (table: string) => {
-      if (table === "payment_gateway") return gatewayQuery;
-      if (table === "orders") return orderQuery;
-      if (table === "payments") return paymentQuery;
-      return {} as any;
-    },
-  );
-
-  try {
-    await handleMidtransWebhook(mockResponse);
-  } catch (err: unknown) {
-    const error = err as Error;
-    assertEquals(error.message, "Failed to create payment");
-  } finally {
-    fromStub.restore();
+    rpcStub.restore();
   }
 });

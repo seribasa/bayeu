@@ -29,7 +29,7 @@ export async function publishEvent(
         tenant_id: tenantId,
         type: event,
         data: payload,
-        ...(typeof payload === 'object' && payload !== null ? payload : {}),
+        ...(typeof payload === "object" && payload !== null ? payload : {}),
       }),
     });
 
@@ -70,7 +70,7 @@ export async function publishPaymentEvent(tenantId: string, payload: unknown) {
         tenant_id: tenantId,
         type: "payment.success",
         data: payload,
-        ...(typeof payload === 'object' && payload !== null ? payload : {}),
+        ...(typeof payload === "object" && payload !== null ? payload : {}),
       }),
     });
 

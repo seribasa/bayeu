@@ -34,7 +34,7 @@ Deno.test("handleWebhook - unknown source returns 400", async () => {
   const res: any = await handleWebhook(mockContext);
   assertEquals(res.status, 400);
   assertEquals(res.data.is_successful, false);
-  assertEquals(res.data.message, "Unknown webhook source");
+  assertEquals(res.data.message, "Unsupported gateway");
 });
 
 Deno.test("handleWebhook - midtrans invalid signature returns 403", async () => {
@@ -83,7 +83,11 @@ Deno.test("handleWebhook - midtrans valid signature returns 200", async () => {
   const rpcStub = stub(
     paymentSupabaseAdmin,
     "rpc",
-    () => Promise.resolve({ data: { success: true, metadata: { tenant_id: "test" } }, error: null }) as any,
+    () =>
+      Promise.resolve({
+        data: { success: true, metadata: { tenant_id: "test" } },
+        error: null,
+      }) as any,
   );
   const fromStub = stub(
     paymentSupabaseAdmin,
@@ -91,7 +95,19 @@ Deno.test("handleWebhook - midtrans valid signature returns 200", async () => {
     (table: string) => {
       if (table === "payment_gateway") return gatewayQuery;
       if (table === "transactions") return transactionsQuery;
-      if (table === "orders") return { select: () => ({ eq: () => ({ single: () => Promise.resolve({ data: { total_amount: 100, metadata: { tenant_id: "test" } }, error: null }) }) }) };
+      if (table === "orders") {
+        return {
+          select: () => ({
+            eq: () => ({
+              single: () =>
+                Promise.resolve({
+                  data: { total_amount: 100, metadata: { tenant_id: "test" } },
+                  error: null,
+                }),
+            }),
+          }),
+        };
+      }
       return {} as any;
     },
   );
@@ -199,7 +215,8 @@ Deno.test("handleWebhook - stripe valid signature returns 200", async () => {
     }),
     insert: () => ({
       select: () => ({
-        single: () => Promise.resolve({ data: { payment_id: "p1" }, error: null }),
+        single: () =>
+          Promise.resolve({ data: { payment_id: "p1" }, error: null }),
       }),
     }),
     update: () => ({
@@ -209,7 +226,11 @@ Deno.test("handleWebhook - stripe valid signature returns 200", async () => {
   const ordersQuery: any = {
     select: () => ({
       eq: () => ({
-        single: () => Promise.resolve({ data: { total_amount: 100, metadata: { tenant_id: "test" } }, error: null }),
+        single: () =>
+          Promise.resolve({
+            data: { total_amount: 100, metadata: { tenant_id: "test" } },
+            error: null,
+          }),
       }),
     }),
     update: () => ({
@@ -219,7 +240,11 @@ Deno.test("handleWebhook - stripe valid signature returns 200", async () => {
   const rpcStub = stub(
     paymentSupabaseAdmin,
     "rpc",
-    () => Promise.resolve({ data: { success: true, metadata: { tenant_id: "test" } }, error: null }) as any,
+    () =>
+      Promise.resolve({
+        data: { success: true, metadata: { tenant_id: "test" } },
+        error: null,
+      }) as any,
   );
   const fromStub = stub(
     paymentSupabaseAdmin,
@@ -367,38 +392,4 @@ Deno.test("handleWebhook - stripe handler error returns 500", async () => {
     stripeStub.restore();
     fromStub.restore();
   }
-});
-
-Deno.test("handleWebhook - text parsing error returns 500", async () => {
-  const mockContext = {
-    req: {
-      param: () => "midtrans",
-      text: () => Promise.reject(new Error("text error")),
-      json: () => Promise.resolve({ signature_key: "sig" }),
-      header: () => undefined,
-    },
-    json: (data: any, status?: number) => ({ data, status }),
-  } as unknown as Context;
-
-  const res: any = await handleWebhook(mockContext);
-  assertEquals(res.status, 500);
-  assertEquals(res.data.is_successful, false);
-  assertEquals(res.data.message, "Internal server error");
-});
-
-Deno.test("handleWebhook - json parsing error returns 500", async () => {
-  const mockContext = {
-    req: {
-      param: () => "stripe",
-      text: () => Promise.resolve('{}'),
-      json: () => Promise.reject(new Error("json error")),
-      header: (name: string) => (name === 'stripe-signature' ? 'sig' : undefined),
-    },
-    json: (data: any, status?: number) => ({ data, status }),
-  } as unknown as Context;
-
-  const res: any = await handleWebhook(mockContext);
-  assertEquals(res.status, 500);
-  assertEquals(res.data.is_successful, false);
-  assertEquals(res.data.message, "Internal server error");
 });

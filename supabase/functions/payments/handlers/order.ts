@@ -14,12 +14,12 @@ export const handleOrderStatus = async (c: Context) => {
         is_successful: false,
         message: "Unauthorized",
       },
-      401
+      401,
     );
   }
   const jwt = getAuthToken(authorization);
-  const { data: userData, error: userError } =
-    await eImunisasiSupabaseAdmin.auth.getUser(jwt);
+  const { data: userData, error: userError } = await eImunisasiSupabaseAdmin
+    .auth.getUser(jwt);
   if (userError) {
     console.error(userError);
     return c.json(
@@ -27,7 +27,7 @@ export const handleOrderStatus = async (c: Context) => {
         is_successful: false,
         message: "Unauthorized",
       },
-      401
+      401,
     );
   }
   const { id: userId } = userData.user;
@@ -48,7 +48,7 @@ export const handleOrderStatus = async (c: Context) => {
         price,
         quantity
       )
-    `
+    `,
     )
     .eq("order_id", orderId)
     .eq("user_id", userId)
@@ -68,7 +68,7 @@ export const handleOrderStatus = async (c: Context) => {
         is_successful: false,
         message,
       },
-      status
+      status,
     );
   }
   return c.json(
@@ -77,6 +77,6 @@ export const handleOrderStatus = async (c: Context) => {
       message: "Order found",
       data,
     },
-    200
+    200,
   );
 };

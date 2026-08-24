@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { handleInitiate } from "./handlers/initiate.ts";
-import { handleInitiatePayment } from "./handlers/initiatePayment.ts";
+import { paymentController } from "./src/di/container.ts";
 import { handleTransaction } from "./handlers/transaction.ts";
 import { handleOrderStatus } from "./handlers/order.ts";
 import { handleWebhook } from "./handlers/webhook.ts";
@@ -15,19 +15,23 @@ const app = new Hono().basePath(`/${functionName}`);
 // ROUTE PAYMENTS
 app.use(logger());
 
-const allowedOrigins = Deno.env.get("ALLOWED_ORIGINS")?.split(",").map(o => o.trim()) || [];
-app.use("/initiate-payment", cors({
-  origin: (origin, _c) => {
-    if (!origin) return null; // Ignore server-to-server or non-CORS requests
-    if (allowedOrigins.includes(origin) || allowedOrigins.includes("*")) {
-      return origin;
-    }
-    return null; // Block others
-  },
-}));
+const allowedOrigins =
+  Deno.env.get("ALLOWED_ORIGINS")?.split(",").map((o) => o.trim()) || [];
+app.use(
+  "/initiate-payment",
+  cors({
+    origin: (origin, _c) => {
+      if (!origin) return null; // Ignore server-to-server or non-CORS requests
+      if (allowedOrigins.includes(origin) || allowedOrigins.includes("*")) {
+        return origin;
+      }
+      return null; // Block others
+    },
+  }),
+);
 
 app.post("/initiate", handleInitiate);
-app.post("/initiate-payment", handleInitiatePayment);
+app.post("/initiate-payment", paymentController.handleInitiatePayment);
 app.get("/redirect", handlePaymentRedirect);
 app.get("/payments/redirect", handlePaymentRedirect);
 app.get("/order/:order_id", handleOrderStatus);
@@ -41,7 +45,7 @@ app.notFound((c) => {
       is_successful: false,
       message: "Route Not Found",
     },
-    404
+    404,
   );
 });
 
