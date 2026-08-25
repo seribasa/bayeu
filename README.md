@@ -34,17 +34,21 @@ This project is built with [Supabase](https://supabase.io/), an open-source Fire
    supabase functions deploy --all
    ```
 
-3. **Run tests:**
+3. **Run tests & coverage:**
 
    ```bash
    cd supabase/functions
-   deno task test
-   ```
 
-4. **Generate coverage stored as a .lcov:**
+   # Pass dummy variables to satisfy legacy test modules
+   SUPABASE_URL="https://mock.supabase.co" \
+   SUPABASE_SERVICE_ROLE_KEY="mock_key" \
+   SUPABASE_ANON_KEY="mock_key" \
+   EIMUNISASI_SUPABASE_URL="https://mock.supabase.co" \
+   EIMUNISASI_SUPABASE_SERVICE_ROLE_KEY="mock_key" \
+   EIMUNISASI_SUPABASE_ANON_KEY="mock_key" \
+   deno test -A --coverage=cov_profile
 
-   ```bash
-   deno task lcov
+   deno coverage cov_profile
    ```
 
 ## Database
