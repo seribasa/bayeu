@@ -11,6 +11,7 @@
     "@supabase/supabase-js": "jsr:@supabase/supabase-js@2",
     "stripe": "npm:stripe@18.0.0",
     "midtrans-client": "npm:midtrans-client@1.4.2",
+    "zod": "npm:zod@^3.23.0",
     "hono": "jsr:@hono/hono",
     "hono/logger": "jsr:@hono/hono/logger",
     "hono/cors": "jsr:@hono/hono/cors",
