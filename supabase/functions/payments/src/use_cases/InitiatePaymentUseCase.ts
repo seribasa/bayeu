@@ -130,17 +130,32 @@ export class InitiatePaymentUseCase {
       defaultUrl?: string,
       field?: string,
     ) => {
-      const allowedOrigins = Deno.env.get("ALLOWED_ORIGINS") || "";
-      const isLocalhost = allowedOrigins.split(",").some((origin) =>
-        origin.trim().toLowerCase().includes("localhost")
-      );
 
       const isSameOrigin = (cUrl?: string, aUrl?: string): boolean => {
         if (!cUrl) return false;
-        if (isLocalhost) return true;
-        if (!aUrl) return true;
+        
         try {
-          return new URL(cUrl).hostname === new URL(aUrl).hostname;
+          const customOrigin = new URL(cUrl).origin;
+          const customHostname = new URL(cUrl).hostname;
+          
+          if (aUrl) {
+            const defaultHostname = new URL(aUrl).hostname;
+            if (customHostname === defaultHostname) return true;
+          } else {
+            return true;
+          }
+
+          const allowedOrigins = Deno.env.get("ALLOWED_ORIGINS")?.split(",").map((o) => o.trim()) || [];
+          if (allowedOrigins.includes(customOrigin) || allowedOrigins.includes("*")) {
+            return true;
+          }
+          
+          // Legacy behavior check for localhost if they just put "localhost" in ALLOWED_ORIGINS
+          if (allowedOrigins.some(o => o.toLowerCase().includes("localhost")) && customHostname === "localhost") {
+            return true;
+          }
+
+          return false;
         } catch {
           return false;
         }
