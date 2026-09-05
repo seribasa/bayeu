@@ -25,7 +25,7 @@
     "npm:@supabase/storage-js@2.7.1": "2.7.1",
     "npm:@types/node@*": "22.12.0",
     "npm:midtrans-client@1.4.2": "1.4.2",
-    "npm:stripe@18.0.0": "18.0.0"
+    "npm:stripe@22.6.1": "22.6.1_@types+node@22.12.0"
   },
   "jsr": {
     "@hono/hono@4.7.7": {
@@ -641,11 +641,13 @@
     "statuses@2.0.2": {
       "integrity": "sha512-DvEy55V3DB7uknRo+4iOGT5fP1slR8wQohVdknigZPMpMstaKJQWhwiYBACJE3Ul2pTnATihhBYnRhZQHGBiRw=="
     },
-    "stripe@18.0.0": {
-      "integrity": "sha512-3Fs33IzKUby//9kCkCa1uRpinAoTvj6rJgQ2jrBEysoxEvfsclvXdna1amyEYbA2EKkjynuB4+L/kleCCaWTpA==",
+    "stripe@22.6.1_@types+node@22.12.0": {
+      "integrity": "sha512-hAKSkGeVt2u46TRYhmnvwmVHxBNtOCJnPjc+SH5sP2B2ypElYzAAY3Ljx0Ar8C2w8nfpFQiZ95qoDCDsFkXMTA==",
       "dependencies": [
-        "@types/node",
-        "qs"
+        "@types/node"
+      ],
+      "optionalPeers": [
+        "@types/node"
       ]
     },
     "toidentifier@1.0.1": {
@@ -826,7 +828,7 @@
       "npm:@hookdeck/outpost-sdk@^1.4.1",
       "npm:@supabase/postgrest-js@1.19.4",
       "npm:midtrans-client@1.4.2",
-      "npm:stripe@18.0.0"
+      "npm:stripe@22.6.1"
     ]
   }
 }
