@@ -10,7 +10,7 @@
     "jose": "https://deno.land/x/jose@v4.14.4/index.ts",
     "@supabase/supabase-js": "jsr:@supabase/supabase-js@2",
     "stripe": "npm:stripe@18.0.0",
-    "midtrans-client": "npm:midtrans-client@1.4.2",
+    "midtrans-client": "npm:midtrans-client@1.4.3",
     "hono": "jsr:@hono/hono",
     "hono/logger": "jsr:@hono/hono/logger",
     "hono/cors": "jsr:@hono/hono/cors",
