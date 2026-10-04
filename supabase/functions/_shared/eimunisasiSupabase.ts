@@ -11,6 +11,13 @@ const EIMUNISASI_SUPABASE_ANON_KEY = Deno.env.get(
 const eImunisasiSupabaseAdmin = createClient(
   EIMUNISASI_SUPABASE_URL ?? "",
   EIMUNISASI_SUPABASE_SERVICE_ROLE_KEY ?? "",
+  {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  },
 );
 
 const eImunisasiSupabaseClient = (

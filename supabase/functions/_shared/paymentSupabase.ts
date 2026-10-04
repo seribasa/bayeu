@@ -9,6 +9,13 @@ const PAYMENT_SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
 const paymentSupabaseAdmin = createClient(
   PAYMENT_SUPABASE_URL ?? "",
   PAYMENT_SUPABASE_SERVICE_ROLE_KEY ?? "",
+  {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  },
 );
 
 const paymentSupabaseClient = (
