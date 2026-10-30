@@ -11,7 +11,7 @@ services:
       - "15672:15672"
 
   postgres:
-    image: postgres:15-alpine
+    image: postgres:18-alpine
     environment:
       POSTGRES_USER: outpost
       POSTGRES_PASSWORD: outpost_password
