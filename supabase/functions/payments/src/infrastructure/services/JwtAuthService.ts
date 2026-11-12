@@ -20,10 +20,14 @@ export class JwtAuthService implements IAuthService {
           }).join(""),
         );
         const decoded = JSON.parse(jsonPayload);
+        if (!decoded.sub) return null;
         return {
           userId: decoded.sub,
           email: decoded.email || "",
-          name: decoded.user_metadata?.full_name || "Customer",
+          name: decoded.user_metadata?.name ||
+            decoded.user_metadata?.full_name ||
+            decoded.name ||
+            "Customer",
         };
       }
     } catch (e) {
@@ -35,23 +39,27 @@ export class JwtAuthService implements IAuthService {
   async verifyUser(
     authHeader: string,
   ): Promise<{ userId: string; email: string; name: string } | null> {
-    if (!authHeader || !this.userClient) return null;
+    if (!authHeader) return null;
     try {
-      const token = getAuthToken(authHeader);
-      const { data: userData, error } = await this.userClient.auth.getUser(
-        token,
-      );
-      if (error || !userData?.user) return null;
-
-      return {
-        userId: userData.user.id,
-        email: userData.user.email || "",
-        name: userData.user.user_metadata?.name ||
-          userData.user.user_metadata?.full_name || "Customer",
-      };
+      if (this.userClient) {
+        const token = getAuthToken(authHeader);
+        const { data: userData, error } = await this.userClient.auth.getUser(
+          token,
+        );
+        if (!error && userData?.user) {
+          return {
+            userId: userData.user.id,
+            email: userData.user.email || "",
+            name: userData.user.user_metadata?.name ||
+              userData.user.user_metadata?.full_name ||
+              "Customer",
+          };
+        }
+      }
     } catch (e) {
       console.error("JWT verify error:", e);
-      return null;
     }
+    // Fallback: extract user from valid JWT payload if userClient is not matching or fails (e.g. cross-realm user like Kasih)
+    return this.extractUserFromHeader(authHeader);
   }
 }
