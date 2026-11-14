@@ -33,13 +33,19 @@ export class PaymentController {
         }, 400);
       }
 
-      const user = this.authService.extractUserFromHeader(authHeader);
+      const user = await this.authService.verifyUser(authHeader);
+      if (!user) {
+        return c.json({
+          is_successful: false,
+          message: "Unauthorized",
+        }, 401);
+      }
 
       const result = await this.initiatePaymentUseCase.execute(
         parsedBody.data,
-        user?.userId || "",
-        user?.email || "",
-        user?.name || "",
+        user.userId,
+        user.email,
+        user.name,
       );
 
       if (!result.is_successful) {
