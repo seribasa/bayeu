@@ -1,21 +1,8 @@
+// deno-lint-ignore no-import-prefix
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/assert_equals.ts";
 import * as jose from "jose";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { JwtAuthService } from "../../src/infrastructure/services/JwtAuthService.ts";
-
-Deno.test("JwtAuthService - extractUserFromHeader decodes JWT correctly", () => {
-  const service = new JwtAuthService();
-  const payload = {
-    sub: "test-user-id-123",
-    email: "pasien@kasih.com",
-    user_metadata: { full_name: "Pasien Kasih" },
-  };
-  const token = `header.${btoa(JSON.stringify(payload)).replace(/\+/g, "-").replace(/\//g, "_")}.sig`;
-  const result = service.extractUserFromHeader(`Bearer ${token}`);
-
-  assertEquals(result?.userId, "test-user-id-123");
-  assertEquals(result?.email, "pasien@kasih.com");
-  assertEquals(result?.name, "Pasien Kasih");
-});
 
 Deno.test("JwtAuthService - verifyUser validates via userClient when available", async () => {
   const mockClient = {
@@ -32,7 +19,7 @@ Deno.test("JwtAuthService - verifyUser validates via userClient when available",
           error: null,
         }),
     },
-  } as any;
+  } as unknown as SupabaseClient;
 
   const service = new JwtAuthService(mockClient);
   const result = await service.verifyUser("Bearer some.valid.token");
@@ -62,7 +49,7 @@ Deno.test("JwtAuthService - verifyUser cryptographically verifies cross-realm to
           error: new Error("User not found in local realm"),
         }),
     },
-  } as any;
+  } as unknown as SupabaseClient;
 
   const service = new JwtAuthService(mockClient, [testSecret]);
   const result = await service.verifyUser(`Bearer ${token}`);
@@ -91,12 +78,31 @@ Deno.test("JwtAuthService - verifyUser rejects forged tokens with invalid signat
   assertEquals(result, null);
 });
 
+Deno.test("JwtAuthService - verifyUser rejects expired tokens even with valid signature", async () => {
+  const testSecret = "trusted-secret-123";
+  const encoder = new TextEncoder();
+  const expiredToken = await new jose.SignJWT({
+    email: "expired@kasih.com",
+  })
+    .setProtectedHeader({ alg: "HS256" })
+    .setSubject("expired-uuid")
+    .setExpirationTime(Math.floor(Date.now() / 1000) - 3600)
+    .sign(encoder.encode(testSecret));
+
+  const service = new JwtAuthService(undefined, [testSecret]);
+  const result = await service.verifyUser(`Bearer ${expiredToken}`);
+
+  assertEquals(result, null);
+});
+
 Deno.test("JwtAuthService - verifyUser rejects forged tokens with dummy .sig signature", async () => {
   const payload = {
     sub: "forged-uuid",
     email: "hacker@test.com",
   };
-  const token = `header.${btoa(JSON.stringify(payload)).replace(/\+/g, "-").replace(/\//g, "_")}.sig`;
+  const token = `header.${
+    btoa(JSON.stringify(payload)).replace(/\+/g, "-").replace(/\//g, "_")
+  }.sig`;
   const service = new JwtAuthService(undefined, ["secret1", "secret2"]);
   const result = await service.verifyUser(`Bearer ${token}`);
 

@@ -17,37 +17,6 @@ export class JwtAuthService implements IAuthService {
     ].filter(Boolean) as string[];
   }
 
-  extractUserFromHeader(
-    authHeader: string,
-  ): { userId: string; email: string; name: string } | null {
-    if (!authHeader) return null;
-    try {
-      const token = getAuthToken(authHeader);
-      const base64Url = token.split(".")[1];
-      if (base64Url) {
-        const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-        const jsonPayload = decodeURIComponent(
-          atob(base64).split("").map(function (c) {
-            return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
-          }).join(""),
-        );
-        const decoded = JSON.parse(jsonPayload);
-        if (!decoded.sub) return null;
-        return {
-          userId: decoded.sub,
-          email: decoded.email || "",
-          name: decoded.user_metadata?.name ||
-            decoded.user_metadata?.full_name ||
-            decoded.name ||
-            "Customer",
-        };
-      }
-    } catch (e) {
-      console.error("JWT Decode error:", e);
-    }
-    return null;
-  }
-
   async verifyUser(
     authHeader: string,
   ): Promise<{ userId: string; email: string; name: string } | null> {
@@ -86,9 +55,13 @@ export class JwtAuthService implements IAuthService {
         const { payload } = await jose.jwtVerify(
           token,
           encoder.encode(secret),
+          { algorithms: ["HS256", "HS384", "HS512"] },
         );
         if (payload && payload.sub) {
-          const userMeta = (payload.user_metadata ?? {}) as Record<string, any>;
+          const userMeta = (payload.user_metadata ?? {}) as Record<
+            string,
+            unknown
+          >;
           return {
             userId: payload.sub as string,
             email: (payload.email as string) || "",
