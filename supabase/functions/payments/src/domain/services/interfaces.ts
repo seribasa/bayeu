@@ -10,9 +10,6 @@ export interface IOutpostService {
 }
 
 export interface IAuthService {
-  extractUserFromHeader(
-    authHeader: string,
-  ): { userId: string; email: string; name: string } | null;
   verifyUser(
     authHeader: string,
   ): Promise<{ userId: string; email: string; name: string } | null>;
